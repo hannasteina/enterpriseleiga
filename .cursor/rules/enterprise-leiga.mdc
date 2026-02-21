@@ -1,0 +1,29 @@
+# Enterprise Leiga - Verkefnareglur
+
+## Um verkefnið
+Enterprise Leiga er leigukerfi byggt á Next.js 14, TypeScript, Tailwind CSS og Supabase.
+
+## Reglur
+
+### Tungumál
+- UI texti: **Íslenska**
+- Breytuheiti og kóði: **Enska**
+- Athugasemdir: Íslenska eða enska
+
+### Kóðastíll
+- Nota TypeScript strict mode
+- Nota Tailwind CSS fyrir stíla (ekki CSS modules)
+- Nota Supabase SSR client á server, browser client á client
+- Nota `@/` import alias
+
+### Möppuskipan
+- `app/` - Next.js síður (App Router)
+- `components/` - React components
+- `components/ui/` - Grunncomponents
+- `lib/` - Hjálparföll, Supabase, types
+- `docs/migrations/` - SQL migrations
+
+### Gagnagrunnur
+- Skrifa allar breytingar sem SQL migrations í `docs/migrations/`
+- Nota RLS (Row Level Security) á öllum töflum
+- Nota snake_case fyrir dálkaheiti

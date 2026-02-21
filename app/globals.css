@@ -3,21 +3,35 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --primary: #1e40af;
+  --primary-light: #3b82f6;
+  --primary-dark: #1e3a8a;
+  --accent: #f59e0b;
+  --surface: #ffffff;
+  --muted: #64748b;
+  --border: #e2e8f0;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f172a;
+    --foreground: #f1f5f9;
+    --primary: #3b82f6;
+    --primary-light: #60a5fa;
+    --primary-dark: #2563eb;
+    --accent: #fbbf24;
+    --surface: #1e293b;
+    --muted: #94a3b8;
+    --border: #334155;
   }
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 }
 
 @layer utilities {

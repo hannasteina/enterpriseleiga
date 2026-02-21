@@ -1,0 +1,31 @@
+# Context Stjórnun
+
+## Markmið
+Halda context notkun undir 50% til að tryggja góða frammistöðu.
+
+## Reglur
+
+### 1. Stuttar samtölur
+- Kláraðu eitt verkefni í einu
+- Stingdu upp á nýju chati þegar verkefni er lokið
+- Ekki safna of mörgum verkefnum í eina samtal
+
+### 2. Skilvirkur skráalestur
+- Lestu aðeins skrár sem þarf
+- Notaðu `Grep` eða `SemanticSearch` í stað þess að lesa heilar skrár
+- Forðastu að lesa sömu skrá oft
+
+### 3. Notaðu Task tool
+- Fyrir rannsóknarvinnu, notaðu `Task` tool með `subagent_type: "explore"`
+- Þetta heldur context í subagent frekar en aðalsamtalinu
+
+### 4. Ekki endurtaka kóða
+- Ekki birta kóða sem þegar hefur verið lesinn
+- Notaðu code references í stað þess að afrita
+- Halda svörum hnitmiðuðum
+
+### 5. Viðvörun
+Þegar context virðist hátt:
+- Minntu notanda á að byrja nýtt chat
+- Lokaðu ónotuðum skrám
+- Einbeittu þér að núverandi verkefni
