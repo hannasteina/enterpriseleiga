@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import type {
-  Tengiliður,
-  TengiliðurAthugasemd,
-  TengiliðurSamskipti,
+import {
+  getVirkirNotendur,
+  type Tengiliður,
+  type TengiliðurAthugasemd,
+  type TengiliðurSamskipti,
 } from '@/lib/enterprise-demo-data';
 
 interface VerkefniFromSamskipti {
   titill: string;
   lysing: string;
   deadline: string;
+  uthlutadA?: string;
 }
 
 interface Props {
@@ -68,8 +70,10 @@ export default function TengilidurPanel({ tengiliður, onClose, onSave, onCreate
   const [nsLysing, setNsLysing] = useState('');
   const [nsSetjaVerkefni, setNsSetjaVerkefni] = useState(false);
   const [nsDeadline, setNsDeadline] = useState('');
+  const [nsUthlutadA, setNsUthlutadA] = useState('');
 
   const [toast, setToast] = useState('');
+  const virkirNotendur = getVirkirNotendur();
 
   useEffect(() => {
     requestAnimationFrame(() => setIsVisible(true));
@@ -160,14 +164,19 @@ export default function TengilidurPanel({ tengiliður, onClose, onSave, onCreate
         titill: nsTitill.trim(),
         lysing: nsLysing.trim(),
         deadline: nsDeadline,
+        uthlutadA: nsUthlutadA || undefined,
       });
-      setToast('Samskipti skráð og verkefni stofnað');
+      const nafn = virkirNotendur.find(n => n.id === nsUthlutadA)?.nafn;
+      setToast(nafn
+        ? `Samskipti skráð og verkefni úthlutað á ${nafn}`
+        : 'Samskipti skráð og verkefni stofnað');
     }
 
     setNsTitill('');
     setNsLysing('');
     setNsSetjaVerkefni(false);
     setNsDeadline('');
+    setNsUthlutadA('');
     setShowNyttSamskipti(false);
   }
 
@@ -464,15 +473,30 @@ export default function TengilidurPanel({ tengiliður, onClose, onSave, onCreate
                       <span className="text-xs text-white/60">Setja sem verkefni</span>
                     </label>
                     {nsSetjaVerkefni && (
-                      <div className="flex items-center gap-2 pl-6">
-                        <span className="text-[11px] text-white/40">Deadline:</span>
-                        <input
-                          type="date"
-                          value={nsDeadline}
-                          onChange={e => setNsDeadline(e.target.value)}
-                          min={new Date().toISOString().split('T')[0]}
-                          className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500/50 [color-scheme:dark]"
-                        />
+                      <div className="space-y-2 pl-6">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-white/40 w-16 shrink-0">Úthluta á:</span>
+                          <select
+                            value={nsUthlutadA}
+                            onChange={e => setNsUthlutadA(e.target.value)}
+                            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500/50 [color-scheme:dark]"
+                          >
+                            <option value="">— Veldu teymismeðlim —</option>
+                            {virkirNotendur.map(n => (
+                              <option key={n.id} value={n.id}>{n.nafn}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-white/40 w-16 shrink-0">Deadline:</span>
+                          <input
+                            type="date"
+                            value={nsDeadline}
+                            onChange={e => setNsDeadline(e.target.value)}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500/50 [color-scheme:dark]"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>

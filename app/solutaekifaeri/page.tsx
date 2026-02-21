@@ -215,16 +215,6 @@ export default function SolutaekifaeriPage() {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setShowStofnaModal(true)}
-                className="group inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-medium transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/20"
-                style={{ background: 'linear-gradient(135deg, #22c55e, #10b981)' }}
-              >
-                <svg className="w-4 h-4 transition-transform group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Stofna nýtt
-              </button>
-              <button
                 onClick={() => setShowFinnaTaekifaeri(true)}
                 className="group inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-medium transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/20"
                 style={{ background: 'linear-gradient(135deg, #3b82f6, #6366f1)' }}
@@ -369,23 +359,35 @@ export default function SolutaekifaeriPage() {
             </svg>
             <h2 className="text-sm font-semibold text-white">Sölurás</h2>
           </div>
-          <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
-            {VIEW_OPTIONS.map(v => (
-              <button
-                key={v.key}
-                onClick={() => setViewMode(v.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all duration-200 ${
-                  viewMode === v.key
-                    ? 'bg-blue-500/20 text-blue-400 shadow-sm'
-                    : 'text-white/40 hover:text-white/60 hover:bg-white/5'
-                }`}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d={v.icon} />
-                </svg>
-                <span className="hidden sm:inline">{v.label}</span>
-              </button>
-            ))}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowStofnaModal(true)}
+              className="group inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-xs font-medium transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/20"
+              style={{ background: 'linear-gradient(135deg, #22c55e, #10b981)' }}
+            >
+              <svg className="w-3.5 h-3.5 transition-transform group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Stofna nýtt
+            </button>
+            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+              {VIEW_OPTIONS.map(v => (
+                <button
+                  key={v.key}
+                  onClick={() => setViewMode(v.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all duration-200 ${
+                    viewMode === v.key
+                      ? 'bg-blue-500/20 text-blue-400 shadow-sm'
+                      : 'text-white/40 hover:text-white/60 hover:bg-white/5'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d={v.icon} />
+                  </svg>
+                  <span className="hidden sm:inline">{v.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -823,7 +825,7 @@ function TableView({ soList, columns, onSelect, onEdit, onDelete }: {
                   <span className="text-xs text-white/40">{formatDate(s.dagsetning)}</span>
                 </td>
                 <td className="px-4 py-3 hidden lg:table-cell">
-                  <span className="text-xs text-amber-400/70">{formatDate(s.naestiKontaktur)}</span>
+                  <span className="text-xs text-orange-500">{formatDate(s.naestiKontaktur)}</span>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

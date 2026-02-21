@@ -2,10 +2,11 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import {
   fyrirtaeki,
+  markhópar as allMarkhópar,
   type Fyrirtaeki,
   type Svid,
   type Tengiliður,
@@ -59,6 +60,25 @@ export default function VidskiptavinirPage() {
   const [selectedTengilidur, setSelectedTengilidur] = useState<Tengiliður | null>(null);
   const [tengiliðirUpdates, setTengiliðirUpdates] = useState<Record<string, Tengiliður>>({});
 
+  // Tengiliðir filters
+  const [tSvidFilter, setTSvidFilter] = useState<Svid | 'all'>('all');
+  const [starfsheitiFilter, setStarfsheitiFilter] = useState('all');
+  const [markhopurFilter, setMarkhopurFilter] = useState('all');
+
+  // Selection & actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [sendSubject, setSendSubject] = useState('');
+  const [sendBody, setSendBody] = useState('');
+  const [sendLoading, setSendLoading] = useState(false);
+  const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(''), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   const filtered = fyrirtaeki.filter((f) => {
     const matchSvid = svidFilter === 'all' || f.svid === svidFilter;
     const matchSearch =
@@ -86,16 +106,19 @@ export default function VidskiptavinirPage() {
 
   const allContacts = useMemo(() => {
     const contacts: { tengiliður: Tengiliður; fyrirtaeki: Fyrirtaeki }[] = [];
-    for (const f of filtered) {
+    const source = tSvidFilter === 'all' ? fyrirtaeki : fyrirtaeki.filter(f => f.svid === tSvidFilter);
+    for (const f of source) {
       for (const t of f.tengiliðir) {
         const updated = tengiliðirUpdates[t.id] ?? t;
         const q = search.trim().toLowerCase();
-        if (
-          !q ||
+        const matchSearch = !q ||
           updated.nafn.toLowerCase().includes(q) ||
           updated.netfang.toLowerCase().includes(q) ||
-          f.nafn.toLowerCase().includes(q)
-        ) {
+          updated.titill.toLowerCase().includes(q) ||
+          f.nafn.toLowerCase().includes(q);
+        const matchStarfsheiti = starfsheitiFilter === 'all' || updated.titill === starfsheitiFilter;
+        const matchMarkhópur = markhopurFilter === 'all' || (updated.markhópar?.includes(markhopurFilter) ?? false);
+        if (matchSearch && matchStarfsheiti && matchMarkhópur) {
           contacts.push({ tengiliður: updated, fyrirtaeki: f });
         }
       }
@@ -103,7 +126,18 @@ export default function VidskiptavinirPage() {
     return contacts.sort((a, b) =>
       a.tengiliður.nafn.localeCompare(b.tengiliður.nafn, 'is-IS'),
     );
-  }, [filtered, tengiliðirUpdates, search]);
+  }, [tengiliðirUpdates, search, tSvidFilter, starfsheitiFilter, markhopurFilter]);
+
+  const uniqueStarfsheiti = useMemo(() => {
+    const set = new Set<string>();
+    for (const f of fyrirtaeki) {
+      for (const t of f.tengiliðir) {
+        const updated = tengiliðirUpdates[t.id] ?? t;
+        if (updated.titill) set.add(updated.titill);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'is-IS'));
+  }, [tengiliðirUpdates]);
 
   const toggleCard = (id: string) => {
     setExpandedCards((prev) => {
@@ -121,6 +155,79 @@ export default function VidskiptavinirPage() {
 
   function getTengilidur(t: Tengiliður): Tengiliður {
     return tengiliðirUpdates[t.id] ?? t;
+  }
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      if (prev.size === allContacts.length) return new Set();
+      return new Set(allContacts.map(c => c.tengiliður.id));
+    });
+  }, [allContacts]);
+
+  const selectedContacts = useMemo(
+    () => allContacts.filter(c => selectedIds.has(c.tengiliður.id)),
+    [allContacts, selectedIds],
+  );
+
+  async function handleExportExcel() {
+    const { utils, writeFile } = await import('xlsx');
+    const rows = (selectedContacts.length > 0 ? selectedContacts : allContacts).map(({ tengiliður: t, fyrirtaeki: f }) => ({
+      'Nafn': t.nafn,
+      'Starfsheiti': t.titill,
+      'Fyrirtæki': f.nafn,
+      'Svið': SVID_LABELS[f.svid],
+      'Netfang': t.netfang,
+      'Sími': t.simi,
+      'Aðaltengiliður': t.aðaltengiliður ? 'Já' : 'Nei',
+      'Staða': t.staða ?? 'virkur',
+      'Markhópar': (t.markhópar ?? []).map(id => allMarkhópar.find(m => m.id === id)?.nafn ?? id).join(', '),
+    }));
+    const ws = utils.json_to_sheet(rows);
+    const colWidths = Object.keys(rows[0] || {}).map(key => ({
+      wch: Math.max(key.length, ...rows.map(r => String(r[key as keyof typeof r] ?? '').length)) + 2,
+    }));
+    ws['!cols'] = colWidths;
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Tengiliðir');
+    writeFile(wb, `tengilidir_${new Date().toISOString().split('T')[0]}.xlsx`);
+    setToast(`${rows.length} tengiliðir fluttir út í Excel`);
+  }
+
+  async function handleSendEmail() {
+    if (!sendSubject.trim() || !sendBody.trim() || selectedContacts.length === 0) return;
+    setSendLoading(true);
+    try {
+      const res = await fetch('/api/send-bulk-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipients: selectedContacts.map(({ tengiliður: t }) => ({
+            email: t.netfang,
+            name: t.nafn,
+          })),
+          subject: sendSubject,
+          body: sendBody,
+        }),
+      });
+      const data = await res.json();
+      setToast(data.message || `Sent á ${selectedContacts.length} tengiliði`);
+      setShowSendModal(false);
+      setSendSubject('');
+      setSendBody('');
+    } catch {
+      setToast('Villa við sendingu');
+    } finally {
+      setSendLoading(false);
+    }
   }
 
   return (
@@ -193,7 +300,7 @@ export default function VidskiptavinirPage() {
           </svg>
           <input
             type="search"
-            placeholder={viewMode === 'fyrirtaeki' ? 'Leita að fyrirtæki...' : 'Leita að tengilið...'}
+            placeholder={viewMode === 'fyrirtaeki' ? 'Leita að fyrirtæki...' : 'Leita að nafni, fyrirtæki eða starfsheiti...'}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#161822] border border-white/5 text-white placeholder:text-white/40 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50"
@@ -223,21 +330,21 @@ export default function VidskiptavinirPage() {
             })}
           </div>
 
-          {/* Company cards in continuous 2-column grid */}
-          <div className="grid grid-cols-2 gap-4">
-            {IS_ALPHABET.filter((letter) => grouped.has(letter)).map((letter) => {
-              const companies = grouped.get(letter)!;
+          {/* Company cards grouped by letter */}
+          <div className="grid grid-cols-3 gap-3">
+            {IS_ALPHABET.map((letter) => {
+              const companies = grouped.get(letter);
               return (
                 <div key={letter} className="contents">
                   <div
                     id={`letter-${letter}`}
-                    className="col-span-2 scroll-mt-4 flex items-center gap-3 pt-2 first:pt-0"
+                    className="col-span-3 scroll-mt-4 flex items-center gap-2 pt-1 first:pt-0"
                   >
-                    <span className="text-base font-bold w-6 text-center text-blue-400">{letter}</span>
+                    <span className={`text-sm font-bold w-5 text-center ${companies ? 'text-blue-400' : 'text-white/15'}`}>{letter}</span>
                     <div className="flex-1 h-px bg-white/5" />
-                    <span className="text-xs text-white/30">{companies.length}</span>
+                    {companies && <span className="text-[10px] text-white/30">{companies.length}</span>}
                   </div>
-                  {companies.map((f) => (
+                  {companies?.map((f) => (
                     <CompanyCard
                       key={f.id}
                       f={f}
@@ -260,10 +367,96 @@ export default function VidskiptavinirPage() {
         </>
       ) : (
         <>
-          {/* Contacts list */}
-          <div className="text-xs text-white/40">
-            {allContacts.length} tengiliðir
+          {/* Tengiliðir filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={tSvidFilter}
+              onChange={e => setTSvidFilter(e.target.value as Svid | 'all')}
+              className="px-3 py-2 rounded-lg bg-[#161822] border border-white/5 text-xs text-white/80 focus:outline-none focus:ring-1 focus:ring-blue-500/50 [color-scheme:dark]"
+            >
+              <option value="all">Öll svið</option>
+              <option value="langtimaleiga">Langtímaleiga</option>
+              <option value="flotaleiga">Flotaleiga</option>
+            </select>
+
+            <select
+              value={starfsheitiFilter}
+              onChange={e => setStarfsheitiFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-[#161822] border border-white/5 text-xs text-white/80 focus:outline-none focus:ring-1 focus:ring-blue-500/50 [color-scheme:dark]"
+            >
+              <option value="all">Öll starfsheiti</option>
+              {uniqueStarfsheiti.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+
+            <select
+              value={markhopurFilter}
+              onChange={e => setMarkhopurFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-[#161822] border border-white/5 text-xs text-white/80 focus:outline-none focus:ring-1 focus:ring-blue-500/50 [color-scheme:dark]"
+            >
+              <option value="all">Allir markhópar</option>
+              {allMarkhópar.map(m => (
+                <option key={m.id} value={m.id}>{m.nafn}</option>
+              ))}
+            </select>
+
+            {(tSvidFilter !== 'all' || starfsheitiFilter !== 'all' || markhopurFilter !== 'all') && (
+              <button
+                onClick={() => { setTSvidFilter('all'); setStarfsheitiFilter('all'); setMarkhopurFilter('all'); }}
+                className="text-xs text-white/30 hover:text-white/60 transition-colors flex items-center gap-1"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Hreinsa síur
+              </button>
+            )}
           </div>
+
+          {/* Summary + actions bar */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer group/check">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === allContacts.length && allContacts.length > 0}
+                  ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < allContacts.length; }}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded border-white/20 bg-white/5 text-blue-500 focus:ring-blue-500/30 focus:ring-offset-0"
+                />
+                <span className="text-xs text-white/40 group-hover/check:text-white/60 transition-colors">
+                  {selectedIds.size > 0 ? `${selectedIds.size} af ${allContacts.length} valdir` : `${allContacts.length} tengiliðir`}
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportExcel}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600/15 border border-green-500/20 text-green-400 text-xs font-medium hover:bg-green-600/25 transition-colors"
+                title={selectedIds.size > 0 ? `Flytja ${selectedIds.size} valda út` : 'Flytja alla út'}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Excel
+              </button>
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={() => setShowSendModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/15 border border-blue-500/20 text-blue-400 text-xs font-medium hover:bg-blue-600/25 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                  Senda á {selectedIds.size} valda
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Contacts list */}
           {allContacts.length === 0 ? (
             <div className="py-12 text-center">
               <p className="text-white/40">Engir tengiliðir fundust.</p>
@@ -274,14 +467,23 @@ export default function VidskiptavinirPage() {
                 const styles = SVID_STYLES[f.svid];
                 const ssCount = t.samskipti?.length ?? 0;
                 const athCount = t.athugasemdir?.length ?? 0;
+                const isChecked = selectedIds.has(t.id);
                 return (
                   <div
                     key={t.id}
-                    onClick={() => setSelectedTengilidur(t)}
-                    className="bg-[#161822] rounded-xl border border-white/5 hover:border-white/15 transition-all cursor-pointer group p-4"
+                    className={`bg-[#161822] rounded-xl border transition-all cursor-pointer group p-4 ${isChecked ? 'border-blue-500/30 bg-blue-500/[0.03]' : 'border-white/5 hover:border-white/15'}`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-3">
+                      <div className="pt-0.5 shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleSelect(t.id)}
+                          onClick={e => e.stopPropagation()}
+                          className="w-4 h-4 rounded border-white/20 bg-white/5 text-blue-500 focus:ring-blue-500/30 focus:ring-offset-0 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0" onClick={() => setSelectedTengilidur(t)}>
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-white">{t.nafn}</span>
                           {t.aðaltengiliður && (
@@ -302,7 +504,7 @@ export default function VidskiptavinirPage() {
                           )}
                         </div>
                         <p className="text-white/50 text-xs mt-0.5">{t.titill}</p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Link
                             href={`/vidskiptavinir/${f.id}`}
                             onClick={(e) => e.stopPropagation()}
@@ -316,6 +518,19 @@ export default function VidskiptavinirPage() {
                           >
                             {SVID_LABELS[f.svid]}
                           </span>
+                          {(t.markhópar ?? []).map(mId => {
+                            const mh = allMarkhópar.find(m => m.id === mId);
+                            if (!mh) return null;
+                            return (
+                              <span
+                                key={mId}
+                                className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                                style={{ backgroundColor: mh.litur + '20', color: mh.litur }}
+                              >
+                                {mh.nafn}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -382,6 +597,84 @@ export default function VidskiptavinirPage() {
           onSave={handleSaveTengilidur}
         />
       )}
+
+      {/* Send email modal */}
+      {showSendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowSendModal(false)}>
+          <div className="bg-[#0f1117] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg mx-4" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white">Senda tölvupóst</h3>
+                <p className="text-xs text-white/40 mt-0.5">Á {selectedContacts.length} valda tengiliði</p>
+              </div>
+              <button onClick={() => setShowSendModal(false)} className="text-white/40 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                {selectedContacts.map(({ tengiliður: t }) => (
+                  <span key={t.id} className="text-[10px] px-2 py-1 rounded-full bg-blue-500/10 text-blue-400 font-medium">
+                    {t.nafn} &lt;{t.netfang}&gt;
+                  </span>
+                ))}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1">Efni</label>
+                <input
+                  value={sendSubject}
+                  onChange={e => setSendSubject(e.target.value)}
+                  placeholder="Efni tölvupósts..."
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1">
+                  Meginmál <span className="text-white/30 font-normal">({'{{nafn}}'} = nafn viðtakanda)</span>
+                </label>
+                <textarea
+                  value={sendBody}
+                  onChange={e => setSendBody(e.target.value)}
+                  rows={6}
+                  placeholder="Sæll/sæl {{nafn}},&#10;&#10;..."
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 resize-none"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-white/5 flex justify-end gap-2">
+              <button
+                onClick={() => setShowSendModal(false)}
+                className="px-4 py-2 rounded-lg text-sm text-white/50 hover:text-white/70 transition-colors"
+              >
+                Hætta við
+              </button>
+              <button
+                onClick={handleSendEmail}
+                disabled={sendLoading || !sendSubject.trim() || !sendBody.trim()}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors inline-flex items-center gap-2"
+              >
+                {sendLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                  </svg>
+                )}
+                Senda
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[60] bg-green-500/90 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
@@ -402,47 +695,46 @@ function CompanyCard({
   const styles = SVID_STYLES[f.svid];
 
   return (
-    <div className="bg-[#161822] rounded-xl border border-white/5 overflow-hidden">
-      <div className="p-5 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <Link href={`/vidskiptavinir/${f.id}`} className="hover:text-blue-400 transition-colors">
-            <h2 className="text-lg font-semibold text-white truncate hover:text-blue-400">{f.nafn}</h2>
+    <div className="bg-[#161822] rounded-lg border border-white/5 overflow-hidden">
+      <div className="p-3 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Link href={`/vidskiptavinir/${f.id}`} className="hover:text-blue-400 transition-colors min-w-0">
+            <h2 className="text-sm font-semibold text-white truncate hover:text-blue-400">{f.nafn}</h2>
           </Link>
           <span
-            className="text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0"
+            className="text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0"
             style={{ backgroundColor: styles.bg, color: styles.text }}
           >
             {SVID_LABELS[f.svid]}
           </span>
         </div>
 
-        <div className="space-y-1 text-sm">
-          <p className="text-white/80">KT: {f.kennitala}</p>
-          <p className="text-white/60 truncate">{f.heimilisfang}</p>
+        <div className="flex items-center gap-2 text-xs text-white/60">
+          <span>KT: {f.kennitala}</span>
+          <span className="text-white/20">|</span>
+          <span className="truncate">{f.heimilisfang}</span>
         </div>
 
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-white/80">
-            <span className="font-medium text-white">{f.virktSamningar}</span>{' '}
-            virkt samningar
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-white/70">
+            <span className="font-medium text-white">{f.virktSamningar}</span> samn.
           </span>
-          <span className="text-white/80">
+          <span className="text-white/70">
             <span className="font-medium text-white">{f.bilar}</span> bílar
           </span>
+          <span className="text-white/40 ml-auto text-[10px]">
+            {formatDate(f.stofnad)}
+          </span>
         </div>
 
-        <p className="text-xs text-white/40">
-          Stofnað: {formatDate(f.stofnad)}
-        </p>
-
-        {/* Contacts section - expandable */}
-        <div className="pt-2 border-t border-white/5">
+        {/* Contacts toggle */}
+        <div className="pt-1.5 border-t border-white/5">
           <button
             onClick={onToggle}
-            className="flex items-center gap-2 w-full text-left text-sm font-medium text-white/80 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium text-white/60 hover:text-white transition-colors"
           >
             <svg
-              className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
+              className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -454,133 +746,40 @@ function CompanyCard({
           </button>
 
           {expanded && (
-            <ul className="mt-3 space-y-3">
+            <ul className="mt-2 space-y-1.5">
               {f.tengiliðir.map((origT) => {
                 const t = getTengilidur(origT);
-                const latestSamskipti = (t.samskipti ?? [])
-                  .sort((a, b) => b.dagsetning.localeCompare(a.dagsetning))
-                  .slice(0, 2);
-                const ssCount = t.samskipti?.length ?? 0;
-                const athCount = t.athugasemdir?.length ?? 0;
                 return (
                   <li
                     key={t.id}
                     onClick={() => onSelectTengilidur(t)}
-                    className="text-sm rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/15 transition-all cursor-pointer group overflow-hidden"
+                    className="text-xs rounded-lg bg-white/[0.02] border border-white/5 hover:border-white/15 transition-all cursor-pointer p-2.5"
                   >
-                    <div className="p-4 pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-white">{t.nafn}</span>
-                            {t.aðaltengiliður && (
-                              <span className="text-amber-400" title="Aðaltengiliður">
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                                </svg>
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-white/50 text-xs mt-0.5">{t.titill}</p>
-                          <div className="flex items-center gap-3 mt-1.5">
-                            <a
-                              href={`mailto:${t.netfang}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-xs text-white/60 hover:text-blue-400 transition-colors"
-                            >
-                              {t.netfang}
-                            </a>
-                            <a
-                              href={`tel:${t.simi}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-xs text-white/60 hover:text-blue-400 transition-colors"
-                            >
-                              {t.simi}
-                            </a>
-                          </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-white text-xs">{t.nafn}</span>
+                          {t.aðaltengiliður && (
+                            <svg className="w-3 h-3 text-amber-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                          )}
                         </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onSelectTengilidur(t); }}
-                          className="text-white/20 group-hover:text-white/50 hover:!text-blue-400 p-1.5 rounded-lg hover:bg-white/5 transition-all shrink-0"
-                          title="Opna / breyta"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                          </svg>
-                        </button>
+                        <p className="text-white/40 text-[10px] truncate">{t.titill}</p>
                       </div>
-
-                      {t.ahugamal && t.ahugamal.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {t.ahugamal.map((a, i) => (
-                            <span
-                              key={i}
-                              className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400"
-                            >
-                              {a}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {(ssCount > 0 || athCount > 0) && (
-                        <div className="flex items-center gap-3 mt-2">
-                          {ssCount > 0 && (
-                            <span className="text-[10px] text-white/30 flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
-                              </svg>
-                              {ssCount} samskipti
-                            </span>
-                          )}
-                          {athCount > 0 && (
-                            <span className="text-[10px] text-white/30 flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-                              </svg>
-                              {athCount}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <a
+                        href={`mailto:${t.netfang}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[10px] text-white/40 hover:text-blue-400 transition-colors shrink-0"
+                      >
+                        {t.netfang}
+                      </a>
                     </div>
-
-                    {latestSamskipti.length > 0 && (
-                      <div className="border-t border-white/5 px-4 py-2 bg-white/[0.01]">
-                        <div className="text-[10px] text-white/25 uppercase tracking-wider mb-1.5">Síðustu samskipti</div>
-                        <div className="space-y-1.5">
-                          {latestSamskipti.map((s) => {
-                            const iconColor = s.tegund === 'símtal' ? '#22c55e' : s.tegund === 'tölvupóstur' ? '#3b82f6' : s.tegund === 'fundur' ? '#f59e0b' : '#6b7280';
-                            return (
-                              <div key={s.id} className="flex items-center gap-2">
-                                <div
-                                  className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
-                                  style={{ backgroundColor: iconColor + '20' }}
-                                >
-                                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: iconColor }} />
-                                </div>
-                                <span className="text-[11px] text-white/60 truncate flex-1">{s.titill}</span>
-                                <span className="text-[10px] text-white/25 shrink-0">{s.dagsetning}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
                   </li>
                 );
               })}
             </ul>
           )}
-        </div>
-
-        <div className="pt-3 border-t border-white/5">
-          <Link
-            href={`/vidskiptavinir/${f.id}`}
-            className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg bg-blue-600/10 text-blue-400 text-sm font-medium hover:bg-blue-600/20 transition-colors"
-          >
-            Skoða fyrirtæki →
-          </Link>
         </div>
       </div>
     </div>
