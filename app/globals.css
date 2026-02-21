@@ -3,39 +3,275 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --primary: #1e40af;
-  --primary-light: #3b82f6;
-  --primary-dark: #1e3a8a;
-  --accent: #f59e0b;
-  --surface: #ffffff;
-  --muted: #64748b;
-  --border: #e2e8f0;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0f172a;
-    --foreground: #f1f5f9;
-    --primary: #3b82f6;
-    --primary-light: #60a5fa;
-    --primary-dark: #2563eb;
-    --accent: #fbbf24;
-    --surface: #1e293b;
-    --muted: #94a3b8;
-    --border: #334155;
-  }
+  --background: #0f1117;
+  --foreground: #ffffff;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+/* Modern animations */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.5s ease-out forwards;
+}
+
+/* ============================================
+   Enterprise Demo – Dark / Light Theme System
+   ============================================ */
+
+[data-enterprise-theme] {
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* --- Background overrides --- */
+[data-enterprise-theme="light"].bg-\[\#0f1117\],
+[data-enterprise-theme="light"] .bg-\[\#0f1117\] {
+  background-color: #eef2e9 !important;
+}
+[data-enterprise-theme="light"] .bg-\[\#161822\] {
+  background-color: #f9faf6 !important;
+}
+[data-enterprise-theme="light"] .bg-\[\#161822\]\/95 {
+  background-color: rgba(249, 250, 246, 0.96) !important;
+}
+[data-enterprise-theme="light"] .bg-\[\#1e2030\] {
+  background-color: #f9faf6 !important;
+}
+[data-enterprise-theme="light"] .bg-white\/5 {
+  background-color: rgba(40, 56, 40, 0.04) !important;
+}
+[data-enterprise-theme="light"] .bg-white\/10 {
+  background-color: rgba(40, 56, 40, 0.06) !important;
+}
+[data-enterprise-theme="light"] .bg-black\/60 {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* --- Text overrides --- */
+[data-enterprise-theme="light"] .text-white {
+  color: #1a1f1c !important;
+}
+[data-enterprise-theme="light"] .text-white\/90 {
+  color: rgba(26, 31, 28, 0.95) !important;
+}
+[data-enterprise-theme="light"] .text-white\/80 {
+  color: rgba(26, 31, 28, 0.88) !important;
+}
+[data-enterprise-theme="light"] .text-white\/70 {
+  color: rgba(26, 31, 28, 0.78) !important;
+}
+[data-enterprise-theme="light"] .text-white\/60 {
+  color: rgba(26, 31, 28, 0.7) !important;
+}
+[data-enterprise-theme="light"] .text-white\/50 {
+  color: rgba(26, 31, 28, 0.62) !important;
+}
+[data-enterprise-theme="light"] .text-white\/40 {
+  color: rgba(26, 31, 28, 0.55) !important;
+}
+[data-enterprise-theme="light"] .text-white\/30 {
+  color: rgba(26, 31, 28, 0.45) !important;
+}
+
+/* --- Border overrides --- */
+[data-enterprise-theme="light"] .border-white\/5 {
+  border-color: rgba(40, 56, 40, 0.07) !important;
+}
+[data-enterprise-theme="light"] .border-white\/10 {
+  border-color: rgba(40, 56, 40, 0.10) !important;
+}
+
+/* --- Hover state overrides --- */
+[data-enterprise-theme="light"] .hover\:text-white:hover {
+  color: #1a1f1c !important;
+}
+[data-enterprise-theme="light"] .hover\:text-white\/70:hover {
+  color: rgba(26, 31, 28, 0.78) !important;
+}
+[data-enterprise-theme="light"] .hover\:bg-white\/5:hover {
+  background-color: rgba(40, 56, 40, 0.05) !important;
+}
+[data-enterprise-theme="light"] .hover\:bg-white\/10:hover {
+  background-color: rgba(40, 56, 40, 0.07) !important;
+}
+[data-enterprise-theme="light"] .hover\:bg-white\/\[0\.02\]:hover {
+  background-color: rgba(40, 56, 40, 0.03) !important;
+}
+
+/* --- Placeholder overrides --- */
+[data-enterprise-theme="light"] .placeholder\:text-white\/30::placeholder {
+  color: rgba(26, 31, 28, 0.4) !important;
+}
+
+/* --- Shadow for light mode cards --- */
+[data-enterprise-theme="light"] .bg-\[\#161822\],
+[data-enterprise-theme="light"] .bg-\[\#1e2030\] {
+  box-shadow: 0 1px 3px rgba(40, 56, 40, 0.06), 0 1px 2px rgba(40, 56, 40, 0.03);
+}
+
+/* --- Modal / panel background --- */
+[data-enterprise-theme="light"].bg-\[\#0f1117\],
+[data-enterprise-theme="light"] .bg-\[\#0f1117\] {
+  background-color: #eef2e9 !important;
+}
+
+/* --- Ring offset for status buttons --- */
+[data-enterprise-theme="light"] .ring-offset-\[\#0f1117\] {
+  --tw-ring-offset-color: #eef2e9 !important;
+}
+
+/* --- Hover border overrides --- */
+[data-enterprise-theme="light"] .hover\:border-white\/15:hover {
+  border-color: rgba(40, 56, 40, 0.12) !important;
+}
+[data-enterprise-theme="light"] .border-white\/\[0\.08\] {
+  border-color: rgba(40, 56, 40, 0.10) !important;
+}
+[data-enterprise-theme="light"] .hover\:border-white\/\[0\.15\]:hover {
+  border-color: rgba(40, 56, 40, 0.15) !important;
+}
+[data-enterprise-theme="light"] .shadow-black\/20 {
+  --tw-shadow-color: rgba(40, 56, 40, 0.06) !important;
+}
+
+/* --- text-white/20 override --- */
+[data-enterprise-theme="light"] .text-white\/20 {
+  color: rgba(26, 31, 28, 0.35) !important;
+}
+
+/* --- Group hover text overrides --- */
+[data-enterprise-theme="light"] .group-hover\:text-white\/30 {
+  color: rgba(26, 31, 28, 0.4) !important;
+}
+
+/* --- Checkbox border in light mode --- */
+[data-enterprise-theme="light"] .border-white\/20 {
+  border-color: rgba(40, 56, 40, 0.18) !important;
+}
+[data-enterprise-theme="light"] .hover\:border-white\/40:hover {
+  border-color: rgba(40, 56, 40, 0.35) !important;
+}
+
+/* --- Card hover background in light mode --- */
+[data-enterprise-theme="light"] .hover\:bg-\[\#1a1d2e\]:hover {
+  background-color: #f0f2ec !important;
+}
+
+/* --- Additional background overrides --- */
+[data-enterprise-theme="light"] .bg-\[\#1a1d2e\] {
+  background-color: #ffffff !important;
+  box-shadow: 0 4px 24px rgba(40, 56, 40, 0.12), 0 1px 4px rgba(40, 56, 40, 0.06);
+}
+[data-enterprise-theme="light"] .bg-\[\#1a1c2e\] {
+  background-color: #ffffff !important;
+}
+[data-enterprise-theme="light"] .bg-\[\#161822\]\/80 {
+  background-color: rgba(249, 250, 246, 0.9) !important;
+}
+[data-enterprise-theme="light"] .bg-\[\#13141f\] {
+  background-color: #f9faf6 !important;
+}
+
+/* --- Inline gradient stat-card fallback for light mode --- */
+[data-enterprise-theme="light"] .hover\:shadow-black\/20:hover {
+  --tw-shadow-color: rgba(40, 56, 40, 0.08) !important;
+}
+
+/* --- Hover bg-white/[0.03] and similar subtle backgrounds --- */
+[data-enterprise-theme="light"] .hover\:bg-white\/\[0\.03\]:hover {
+  background-color: rgba(40, 56, 40, 0.03) !important;
+}
+[data-enterprise-theme="light"] .border-white\/\[0\.03\] {
+  border-color: rgba(40, 56, 40, 0.04) !important;
+}
+
+/* --- Accent text colors for light mode readability --- */
+[data-enterprise-theme="light"] .text-emerald-400 {
+  color: #059669 !important;
+}
+[data-enterprise-theme="light"] .text-blue-400 {
+  color: #2563eb !important;
+}
+[data-enterprise-theme="light"] .text-amber-400 {
+  color: #d97706 !important;
+}
+[data-enterprise-theme="light"] .text-purple-400 {
+  color: #7c3aed !important;
+}
+[data-enterprise-theme="light"] .text-green-400 {
+  color: #16a34a !important;
+}
+[data-enterprise-theme="light"] .text-red-400 {
+  color: #dc2626 !important;
+}
+
+/* --- Accent bg opacity tweaks for better light mode contrast --- */
+[data-enterprise-theme="light"] .bg-emerald-500\/10 {
+  background-color: rgba(5, 150, 105, 0.1) !important;
+}
+[data-enterprise-theme="light"] .bg-blue-500\/10 {
+  background-color: rgba(37, 99, 235, 0.1) !important;
+}
+[data-enterprise-theme="light"] .bg-amber-500\/10 {
+  background-color: rgba(217, 119, 6, 0.1) !important;
+}
+[data-enterprise-theme="light"] .bg-purple-500\/10 {
+  background-color: rgba(124, 58, 237, 0.1) !important;
+}
+[data-enterprise-theme="light"] .bg-blue-600\/20 {
+  background-color: rgba(37, 99, 235, 0.12) !important;
+}
+[data-enterprise-theme="light"] .bg-blue-500\/20 {
+  background-color: rgba(37, 99, 235, 0.12) !important;
+}
+
+/* --- Stat card & hero gradient overrides for light mode --- */
+[data-enterprise-theme="light"] .enterprise-hero-gradient {
+  background: linear-gradient(135deg, #e8ecf4 0%, #ede8f5 50%, #e8ecf4 100%) !important;
+}
+[data-enterprise-theme="light"] .enterprise-stat-gradient {
+  background: linear-gradient(135deg, #f9faf6 0%, #f0f3ee 100%) !important;
+  box-shadow: 0 1px 3px rgba(40, 56, 40, 0.06), 0 1px 2px rgba(40, 56, 40, 0.03);
 }

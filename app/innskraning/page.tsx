@@ -23,7 +23,7 @@ export default function Innskraning() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        window.location.href = '/'
+        window.location.href = '/dashboard'
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Villa kom upp')

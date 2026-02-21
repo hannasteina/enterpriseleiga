@@ -1,0 +1,17 @@
+-- Automation functions for Enterprise Leiga
+--
+-- Functions:
+--   check_expiring_contracts() - Creates tasks when contracts expire within 30 days
+--   check_service_reminders() - Sends reminders 14 days before service
+--
+-- Triggers:
+--   create_leiguferill_for_samningur - Auto-creates workflow steps for new contracts
+--   advance_leiguferill - Auto-advances workflow and creates tasks
+--   log_samningur_activity - Auto-logs contract changes
+--   log_mal_activity - Auto-logs case changes
+--
+-- pg_cron schedules:
+--   check-expiring-contracts: daily at 08:00
+--   check-service-reminders: daily at 08:30
+--
+-- Applied via Supabase MCP on 2026-02-21

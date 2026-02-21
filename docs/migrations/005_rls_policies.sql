@@ -1,0 +1,9 @@
+-- RLS Policies with svid separation
+-- Helper functions: get_user_svid(), is_admin_or_super(), user_has_svid()
+-- 
+-- Key rules:
+--   Langtímaleiga users: see only langtimaleiga data
+--   Flotaleiga users: see flotaleiga AND langtimaleiga data
+--   Admin/Super Admin: see everything
+--
+-- Applied to all business tables via Supabase MCP on 2026-02-21
