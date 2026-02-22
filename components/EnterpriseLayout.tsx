@@ -133,6 +133,15 @@ function EnterpriseDemoInner({ children }: { children: React.ReactNode }) {
     return pathname === href || pathname.startsWith(href + '/');
   };
 
+  const isPublicRoute = pathname.startsWith('/golfmot');
+  if (isPublicRoute) {
+    return (
+      <div data-enterprise-theme={theme} className="min-h-screen">
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div data-enterprise-theme={theme} className="min-h-screen bg-[#0f1117] flex">
       {sidebarOpen && (

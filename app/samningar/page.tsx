@@ -302,16 +302,7 @@ export default function SamningarPage() {
                     return (
                       <tr key={s.id} onClick={() => setSelectedSamningur(s)} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer">
                         <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-2">
-                            {s.status === 'rennur_ut' && (
-                              <span className="text-amber-400" title="Rennur út bráðum">
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                              </span>
-                            )}
-                            <span className="text-sm font-medium text-white">{f?.nafn ?? '—'}</span>
-                          </div>
+                          <span className="text-sm font-medium text-white">{f?.nafn ?? '—'}</span>
                         </td>
                         <td className="px-5 py-3.5">
                           <span
@@ -336,7 +327,7 @@ export default function SamningarPage() {
                         </td>
                         <td className="px-5 py-3.5">
                           <span
-                            className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                            className="text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
                             style={{
                               backgroundColor: getStatusBg(s.status),
                               color: getStatusColor(s.status),
@@ -349,7 +340,7 @@ export default function SamningarPage() {
                           {dagar !== null && s.status !== 'lokid' && s.status !== 'uppsagt' ? (
                             <span
                               className={`text-xs font-medium ${
-                                dagar <= 0 ? 'text-white/40' : dagar <= 14 ? 'text-red-400' : 'text-amber-400'
+                                dagar <= 0 ? 'text-white/40' : dagar <= 14 ? 'text-red-400' : 'text-orange-500'
                               }`}
                             >
                               {dagar <= 0 ? '—' : `${dagar} dagar`}
@@ -604,13 +595,13 @@ function SamningurDetail({ samningur, onClose, onUpdate }: { samningur: Samningu
             <div className="space-y-6">
               {/* Status banner */}
               {samningur.status === 'rennur_ut' && dagar !== null && (
-                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <svg className="w-5 h-5 text-amber-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                  <svg className="w-5 h-5 text-orange-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <div className="text-sm font-medium text-amber-400">Samningur rennur út eftir {dagar} daga</div>
-                    <div className="text-xs text-amber-400/60 mt-0.5">Lokadagur: {samningur.lokadagur}</div>
+                    <div className="text-sm font-medium text-orange-500">Samningur rennur út eftir {dagar} daga</div>
+                    <div className="text-xs text-orange-500/60 mt-0.5">Lokadagur: {samningur.lokadagur}</div>
                   </div>
                 </div>
               )}
@@ -741,7 +732,7 @@ function SamningurDetail({ samningur, onClose, onUpdate }: { samningur: Samningu
                 </div>
                 <div className="bg-white/5 rounded-lg p-4 text-center">
                   <div className="text-xs text-white/40 mb-1">Dagar eftir</div>
-                  <div className={`text-lg font-bold ${dagar !== null && dagar <= 30 ? 'text-amber-400' : 'text-white'}`}>
+                  <div className={`text-lg font-bold ${dagar !== null && dagar <= 30 ? 'text-orange-500' : 'text-white'}`}>
                     {dagar !== null && dagar > 0 ? dagar : '—'}
                   </div>
                 </div>

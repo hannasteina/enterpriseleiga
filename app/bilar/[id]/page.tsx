@@ -15,9 +15,15 @@ import {
   getFyrirtaeki,
   getSamningur,
   getThjonustuFerillBils,
+  getVirktThjonustuverk,
+  virktThjonustuverk,
+  thpilaThjonustuFerill,
   type SamningsSkjal,
   type Svid,
+  type VirktThjonustuverk,
+  type Bill,
 } from '@/lib/enterprise-demo-data';
+import SetjaIThjonustuModal from '@/components/SetjaIThjonustuModal';
 
 interface LeiguferliSkref {
   id: string;
@@ -111,6 +117,13 @@ export default function BillDetailPage() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [aktivtFerli, setAktivtFerli] = useState<AktiftFerliSkref[] | null>(null);
 
+  const [showThjonustuModal, setShowThjonustuModal] = useState(false);
+  const [localCarStatus, setLocalCarStatus] = useState<Bill['status'] | null>(null);
+  const [virktVerk, setVirktVerk] = useState<VirktThjonustuverk | null>(null);
+  const [thjonustuToast, setThjonustuToast] = useState<string | null>(null);
+
+  const effectiveStatus = localCarStatus ?? car?.status ?? 'laus';
+
   const fyrirtaeki = car?.fyrirtaekiId ? getFyrirtaeki(car.fyrirtaekiId) : null;
   const samningur = car?.samningurId ? getSamningur(car.samningurId) : null;
 
@@ -167,6 +180,42 @@ export default function BillDetailPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldAutoOpenAssign]);
+
+  useEffect(() => {
+    if (car) {
+      const existing = getVirktThjonustuverk(car.id);
+      if (existing) setVirktVerk(existing);
+    }
+  }, [car]);
+
+  const handleSetjaIThjonustu = useCallback((verk: Omit<VirktThjonustuverk, 'id'>) => {
+    const newVerk: VirktThjonustuverk = { ...verk, id: `vt-${Date.now()}` };
+    virktThjonustuverk.push(newVerk);
+    setVirktVerk(newVerk);
+    setLocalCarStatus('í þjónustu');
+    setThjonustuToast(`${car?.numer} sett í þjónustu`);
+    setTimeout(() => setThjonustuToast(null), 4000);
+  }, [car]);
+
+  const handleLjukaThjonustu = useCallback(() => {
+    if (!virktVerk || !car) return;
+    thpilaThjonustuFerill.push({
+      id: `tf-${Date.now()}`,
+      billId: car.id,
+      dagsetning: new Date().toISOString().split('T')[0],
+      tegund: virktVerk.tegund,
+      lysing: virktVerk.lysing,
+      stadur: virktVerk.stadur,
+      kostnadur: virktVerk.kostnadur ?? 0,
+      km: virktVerk.km ?? 0,
+    });
+    const idx = virktThjonustuverk.findIndex(v => v.id === virktVerk.id);
+    if (idx !== -1) virktThjonustuverk.splice(idx, 1);
+    setVirktVerk(null);
+    setLocalCarStatus('laus');
+    setThjonustuToast(`Þjónustu lokið — ${car.numer} er laus aftur`);
+    setTimeout(() => setThjonustuToast(null), 4000);
+  }, [virktVerk, car]);
 
   if (!car) {
     return (
@@ -315,9 +364,9 @@ export default function BillDetailPage() {
           <div className="flex flex-wrap gap-2 mt-3">
             <span
               className="text-xs px-2.5 py-1 rounded-full font-medium"
-              style={{ backgroundColor: getStatusBg(car.status), color: getStatusColor(car.status) }}
+              style={{ backgroundColor: getStatusBg(effectiveStatus), color: getStatusColor(effectiveStatus) }}
             >
-              {car.status}
+              {effectiveStatus}
             </span>
             <span
               className="text-xs px-2.5 py-1 rounded-full font-medium bg-white/10 text-white/80"
@@ -335,16 +384,27 @@ export default function BillDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {(car.status === 'laus' && !assigned) && (
-            <button
-              onClick={openAssignPanel}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors shadow-lg shadow-emerald-600/20"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-              Úthluta bíl
-            </button>
+          {(effectiveStatus === 'laus' && !assigned) && (
+            <>
+              <button
+                onClick={() => setShowThjonustuModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors shadow-lg shadow-amber-600/20"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17l-5.384 3.183A1.25 1.25 0 014.5 17.18V6.82a1.25 1.25 0 011.536-1.173l5.384 3.183m0 0a1.125 1.125 0 010 2.346m0-2.346a1.125 1.125 0 000 2.346m5.06-9.283A9.75 9.75 0 0121.75 12c0 1.875-.527 3.627-1.44 5.117" />
+                </svg>
+                Setja í þjónustu
+              </button>
+              <button
+                onClick={openAssignPanel}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors shadow-lg shadow-emerald-600/20"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                Úthluta bíl
+              </button>
+            </>
           )}
           <button
             onClick={openSendPanel}
@@ -357,6 +417,70 @@ export default function BillDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Virkt þjónustuverk */}
+      {virktVerk && effectiveStatus === 'í þjónustu' && (() => {
+        const dagsInni = new Date(virktVerk.dagsInni);
+        const dagarInni = Math.max(1, Math.ceil((Date.now() - dagsInni.getTime()) / (1000 * 60 * 60 * 24)));
+        const skiladagur = new Date(virktVerk.aaetladurSkiladagur);
+        const dagarEftir = Math.ceil((skiladagur.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        return (
+          <div className="bg-amber-500/5 rounded-xl border border-amber-500/20 overflow-hidden">
+            <div className="px-5 py-4 border-b border-amber-500/10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17l-5.384 3.183A1.25 1.25 0 014.5 17.18V6.82a1.25 1.25 0 011.536-1.173l5.384 3.183m0 0a1.125 1.125 0 010 2.346m0-2.346a1.125 1.125 0 000 2.346m5.06-9.283A9.75 9.75 0 0121.75 12c0 1.875-.527 3.627-1.44 5.117" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-amber-400">Í þjónustu</h2>
+                  <p className="text-xs text-white/40">{dagarInni} {dagarInni === 1 ? 'dagur' : 'dagar'} í þjónustu</p>
+                </div>
+              </div>
+              <button
+                onClick={handleLjukaThjonustu}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Ljúka þjónustu
+              </button>
+            </div>
+            <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+              <div>
+                <span className="text-white/40 block text-xs">Tegund</span>
+                <span className="text-white/80 capitalize">{virktVerk.tegund}</span>
+              </div>
+              <div>
+                <span className="text-white/40 block text-xs">Staður</span>
+                <span className="text-white/80">{virktVerk.stadur}</span>
+              </div>
+              <div>
+                <span className="text-white/40 block text-xs">Dagsetning inn</span>
+                <span className="text-white/80">{virktVerk.dagsInni}</span>
+              </div>
+              <div>
+                <span className="text-white/40 block text-xs">Áætlaður skiladagur</span>
+                <span className={dagarEftir <= 0 ? 'text-red-400 font-medium' : dagarEftir <= 2 ? 'text-amber-400' : 'text-white/80'}>
+                  {virktVerk.aaetladurSkiladagur}
+                  {dagarEftir <= 0 && ' (seint!)'}
+                </span>
+              </div>
+            </div>
+            <div className="px-5 pb-4 space-y-2">
+              <div className="text-xs text-white/60">{virktVerk.lysing}</div>
+              {virktVerk.kostnadur != null && virktVerk.kostnadur > 0 && (
+                <div className="text-xs text-white/40">Áætlaður kostnaður: {formatCurrency(virktVerk.kostnadur)}</div>
+              )}
+              {virktVerk.athugasemdir && (
+                <div className="text-xs text-white/40 italic">{virktVerk.athugasemdir}</div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Car Image */}
       {car.imageUrl && (
@@ -1120,6 +1244,25 @@ export default function BillDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Setja í þjónustu modal */}
+      {showThjonustuModal && (
+        <SetjaIThjonustuModal
+          bill={car}
+          onClose={() => setShowThjonustuModal(false)}
+          onSubmit={handleSetjaIThjonustu}
+        />
+      )}
+
+      {/* Toast */}
+      {thjonustuToast && (
+        <div className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl bg-[#161822] border border-white/10 shadow-2xl text-sm text-white flex items-center gap-3 animate-in slide-in-from-bottom-4">
+          <svg className="w-5 h-5 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {thjonustuToast}
+        </div>
+      )}
     </div>
   );
 }

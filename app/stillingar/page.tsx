@@ -50,7 +50,6 @@ export default function StillingarPage() {
       thjonustufulltrui: ['langtimaleiga'],
     };
     setLocalNotendur(prev => prev.map(n => n.id === id ? { ...n, hlutverk, svid: svidMap[hlutverk] } : n));
-    setEditingUser(null);
   };
 
   const toggleSvid = (id: string, svid: Svid) => {
@@ -258,6 +257,18 @@ export default function StillingarPage() {
                                 : ''
                             }
                           </p>
+                        </div>
+
+                        <div className="flex justify-end pt-2 border-t border-white/5">
+                          <button
+                            onClick={() => setEditingUser(null)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-500 transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Vista
+                          </button>
                         </div>
                       </div>
                     )}

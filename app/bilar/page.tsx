@@ -9,13 +9,17 @@ import {
   formatCurrency,
   getStatusColor,
   getStatusBg,
+  getVirktThjonustuverk,
+  virktThjonustuverk,
   type Bill,
   type BilaFlokkur,
+  type VirktThjonustuverk,
   thpilaFlokkar,
   thpilaFlokkaLitir,
 } from '@/lib/enterprise-demo-data';
 import BilPanel from '@/components/BilPanel';
 import NyBilModal from '@/components/NyBilModal';
+import SetjaIThjonustuModal from '@/components/SetjaIThjonustuModal';
 import ImageLightbox, { CarPlaceholderIcon } from '@/components/ImageLightbox';
 
 type StatusFilter = 'allir' | 'í leigu' | 'laus' | 'í þjónustu' | 'skil_væntanleg';
@@ -46,6 +50,7 @@ export default function BilarPage() {
   const [search, setSearch] = useState('');
   const [selectedCar, setSelectedCar] = useState<Bill | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [thjonustuBill, setThjonustuBill] = useState<Bill | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -88,6 +93,14 @@ export default function BilarPage() {
     setBilarList((prev) => [newBill, ...prev]);
     setShowAddModal(false);
     showToast('Nýr bíll skráður');
+  }
+
+  function handleSetjaIThjonustu(verk: Omit<VirktThjonustuverk, 'id'>) {
+    const newVerk: VirktThjonustuverk = { ...verk, id: `vt-${Date.now()}` };
+    virktThjonustuverk.push(newVerk);
+    setBilarList(prev => prev.map(b => b.id === verk.billId ? { ...b, status: 'í þjónustu' as const } : b));
+    setThjonustuBill(null);
+    showToast(`${bilarList.find(b => b.id === verk.billId)?.numer} sett í þjónustu`);
   }
 
   return (
@@ -276,7 +289,7 @@ export default function BilarPage() {
                   <tr
                     key={b.id}
                     onClick={() => setSelectedCar(b)}
-                    className="border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer"
+                    className="border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer group/row"
                   >
                     <td className="px-5 py-2.5">
                       {b.imageUrl ? (
@@ -316,15 +329,46 @@ export default function BilarPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span
-                        className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                        style={{
-                          backgroundColor: getStatusBg(b.status),
-                          color: getStatusColor(b.status),
-                        }}
-                      >
-                        {statusLabels[b.status] || b.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {b.status === 'í þjónustu' ? (() => {
+                          const verk = getVirktThjonustuverk(b.id);
+                          return (
+                            <div className="group relative">
+                              <span
+                                className="text-[10px] px-2 py-0.5 rounded-full font-medium cursor-help"
+                                style={{ backgroundColor: getStatusBg(b.status), color: getStatusColor(b.status) }}
+                              >
+                                {statusLabels[b.status]}
+                              </span>
+                              {verk && (
+                                <div className="absolute bottom-full left-0 mb-2 w-56 p-3 rounded-lg bg-[#1a1d2e] border border-white/10 shadow-xl text-xs invisible group-hover:visible z-30">
+                                  <div className="text-white/80 font-medium mb-1 capitalize">{verk.tegund}</div>
+                                  <div className="text-white/50">{verk.stadur}</div>
+                                  <div className="text-white/40 mt-1">Skil: {verk.aaetladurSkiladagur}</div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })() : (
+                          <span
+                            className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                            style={{ backgroundColor: getStatusBg(b.status), color: getStatusColor(b.status) }}
+                          >
+                            {statusLabels[b.status] || b.status}
+                          </span>
+                        )}
+                        {b.status === 'laus' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setThjonustuBill(b); }}
+                            className="p-1 rounded-md opacity-0 group-hover/row:opacity-100 hover:bg-amber-500/15 text-white/30 hover:text-amber-400 transition-all"
+                            title="Setja í þjónustu"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17l-5.384 3.183A1.25 1.25 0 014.5 17.18V6.82a1.25 1.25 0 011.536-1.173l5.384 3.183m0 0a1.125 1.125 0 010 2.346m0-2.346a1.125 1.125 0 000 2.346m5.06-9.283A9.75 9.75 0 0121.75 12c0 1.875-.527 3.627-1.44 5.117" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-3.5">
                       {fyrirtaekiData ? (
@@ -371,6 +415,14 @@ export default function BilarPage() {
         <NyBilModal
           onClose={() => setShowAddModal(false)}
           onSave={handleAddCar}
+        />
+      )}
+
+      {thjonustuBill && (
+        <SetjaIThjonustuModal
+          bill={thjonustuBill}
+          onClose={() => setThjonustuBill(null)}
+          onSubmit={handleSetjaIThjonustu}
         />
       )}
 

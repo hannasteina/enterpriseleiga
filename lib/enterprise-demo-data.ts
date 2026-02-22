@@ -851,7 +851,7 @@ export function formatCurrency(amount: number): string {
 export function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
     'virkur': '#22c55e',
-    'rennur_ut': '#f59e0b',
+    'rennur_ut': '#ea580c',
     'lokid': '#6b7280',
     'uppsagt': '#ef4444',
     'í leigu': '#3b82f6',
@@ -882,6 +882,7 @@ export function getStatusColor(status: string): string {
 
 export function getStatusBg(status: string): string {
   const color = getStatusColor(status);
+  if (status === 'rennur_ut') return color + '28';
   return color + '20';
 }
 
@@ -960,6 +961,29 @@ export function getSamningur(id: string) {
 
 export function getThjonustuFerillBils(billId: string) {
   return thpilaThjonustuFerill.filter(t => t.billId === billId);
+}
+
+// Virkt þjónustuverk - bíll sem er núna í þjónustu
+export interface VirktThjonustuverk {
+  id: string;
+  billId: string;
+  tegund: 'þjónustuskoðun' | 'dekkjaskipti' | 'smurþjónusta' | 'olíuskipti' | 'hefðbundið viðhald' | 'viðgerð';
+  lysing: string;
+  stadur: string;
+  dagsInni: string;
+  aaetladurSkiladagur: string;
+  kostnadur?: number;
+  km?: number;
+  athugasemdir?: string;
+  aminningId?: string;
+}
+
+export const virktThjonustuverk: VirktThjonustuverk[] = [
+  { id: 'vt1', billId: 'b28', tegund: 'hefðbundið viðhald', lysing: 'Regluleg 40.000 km skoðun og olíuskipti', stadur: 'Hekla Verkstæði', dagsInni: '2026-02-20', aaetladurSkiladagur: '2026-02-24', kostnadur: 35000, km: 38900, athugasemdir: 'Einnig athuga hemla', aminningId: 'ta5' },
+];
+
+export function getVirktThjonustuverk(billId: string): VirktThjonustuverk | undefined {
+  return virktThjonustuverk.find(v => v.billId === billId);
 }
 
 // Þjónustuferill - saga yfir þjónustu sem hefur verið framkvæmd

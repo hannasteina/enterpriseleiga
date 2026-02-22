@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -19,8 +19,11 @@ import {
   getBill,
   getStatusColor,
   getStatusBg,
+  getVirkirNotendur,
+  hlutverkLysingar,
   type Verkefni,
   type Forgangur,
+  type Notandi,
 } from '@/lib/enterprise-demo-data';
 import { useVerkefniStore } from '@/lib/verkefni-store';
 import VerkefniDetailModal from '@/components/VerkefniDetailModal';
@@ -134,9 +137,11 @@ function KanbanColumn({
 function KanbanCard({
   v,
   onClick,
+  onAssign,
 }: {
   v: Verkefni;
   onClick: () => void;
+  onAssign: (nafn: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: v.id,
@@ -151,13 +156,112 @@ function KanbanCard({
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <VerkefniCard v={v} onClick={onClick} />
+      <VerkefniCard v={v} onClick={onClick} onAssign={onAssign} />
+    </div>
+  );
+}
+
+// ─── Assignee Dropdown ──────────────────────────────────────────
+function AssigneeDropdown({
+  currentName,
+  onAssign,
+}: {
+  currentName: string;
+  onAssign: (nafn: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const notendur = useMemo(() => getVirkirNotendur(), []);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setOpen(!open);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className="flex items-center gap-2 rounded-lg px-1.5 py-1 -ml-1.5 hover:bg-white/[0.06] transition-colors group/assign"
+        title="Úthluta á teymislið"
+      >
+        <div
+          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+          style={{ backgroundColor: getAvatarColor(currentName) }}
+        >
+          {currentName[0]}
+        </div>
+        <span className="text-[11px] text-white/50 group-hover/assign:text-white/70 transition-colors">{currentName}</span>
+        <svg className="w-3 h-3 text-white/20 group-hover/assign:text-white/40 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 bottom-full mb-2 w-56 bg-[#1a1d2e] border border-white/10 rounded-xl shadow-2xl shadow-black/40 z-50 py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-2 border-b border-white/5">
+            <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Úthluta á</span>
+          </div>
+          <div className="max-h-[200px] overflow-y-auto py-1">
+            {notendur.map((n: Notandi) => {
+              const firstName = n.nafn.split(' ')[0];
+              const isActive = currentName === firstName || currentName === n.nafn;
+              return (
+                <button
+                  key={n.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onAssign(firstName);
+                    setOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
+                    isActive ? 'bg-blue-500/10' : 'hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                    style={{ backgroundColor: getAvatarColor(firstName) }}
+                  >
+                    {firstName[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-xs font-medium truncate ${isActive ? 'text-blue-400' : 'text-white/80'}`}>
+                      {n.nafn}
+                    </div>
+                    <div className="text-[10px] text-white/30 truncate">{hlutverkLysingar[n.hlutverk]?.label}</div>
+                  </div>
+                  {isActive && (
+                    <svg className="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── Rich Task Card (shared between Kanban & Card overlay) ──────
-function VerkefniCard({ v, onClick }: { v: Verkefni; onClick: () => void }) {
+function VerkefniCard({ v, onClick, onAssign }: { v: Verkefni; onClick: () => void; onAssign?: (nafn: string) => void }) {
   const fyrirtaeki = v.fyrirtaekiId ? getFyrirtaeki(v.fyrirtaekiId) : null;
   const bill = v.billId ? getBill(v.billId) : null;
   const progress = getChecklistProgress(v);
@@ -263,16 +367,20 @@ function VerkefniCard({ v, onClick }: { v: Verkefni; onClick: () => void }) {
 
         {/* Footer: avatar, deadline, comment count */}
         <div className="flex items-center justify-between pt-2.5 border-t border-white/[0.05]">
-          {/* Assignee avatar */}
-          <div className="flex items-center gap-2">
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-              style={{ backgroundColor: getAvatarColor(v.abyrgdaradili) }}
-            >
-              {v.abyrgdaradili[0]}
+          {/* Assignee avatar with dropdown */}
+          {onAssign ? (
+            <AssigneeDropdown currentName={v.abyrgdaradili} onAssign={onAssign} />
+          ) : (
+            <div className="flex items-center gap-2">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                style={{ backgroundColor: getAvatarColor(v.abyrgdaradili) }}
+              >
+                {v.abyrgdaradili[0]}
+              </div>
+              <span className="text-[11px] text-white/50">{v.abyrgdaradili}</span>
             </div>
-            <span className="text-[11px] text-white/50">{v.abyrgdaradili}</span>
-          </div>
+          )}
 
           <div className="flex items-center gap-3">
             {/* Comment count */}
@@ -436,7 +544,7 @@ export default function VerkefnalistiPage() {
 
   // Stats
   const stats = useMemo(() => {
-    const opin = verkefniList.filter((v) => v.status === 'opið').length;
+    const stofnud = verkefniList.filter((v) => v.status === 'opið').length;
     const iGangi = verkefniList.filter((v) => v.status === 'í gangi').length;
     const lokid = verkefniList.filter((v) => v.status === 'lokið').length;
     const sjalfvirk = verkefniList.filter((v) => v.sjálfvirkt).length;
@@ -446,7 +554,7 @@ export default function VerkefnalistiPage() {
       return new Date(v.deadline) < new Date();
     }).length;
     const completionPct = total > 0 ? Math.round((lokid / total) * 100) : 0;
-    return { opin, iGangi, lokid, sjalfvirk, total, overdue, completionPct };
+    return { stofnud, iGangi, lokid, sjalfvirk, total, overdue, completionPct };
   }, [verkefniList]);
 
   // Filtering
@@ -587,7 +695,7 @@ export default function VerkefnalistiPage() {
           </div>
         </div>
 
-        <StatCard label="Opin" value={stats.opin} color="#3b82f6" icon={
+        <StatCard label="Stofnuð" value={stats.stofnud} color="#3b82f6" icon={
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -723,7 +831,7 @@ export default function VerkefnalistiPage() {
             {(['opið', 'í gangi', 'lokið'] as const).map((status) => (
               <KanbanColumn key={status} status={status} count={groupedByStatus[status].length}>
                 {groupedByStatus[status].map((v) => (
-                  <KanbanCard key={v.id} v={v} onClick={() => setSelectedVerkefniId(v.id)} />
+                  <KanbanCard key={v.id} v={v} onClick={() => setSelectedVerkefniId(v.id)} onAssign={(nafn) => store.assignVerkefni(v.id, nafn)} />
                 ))}
                 {groupedByStatus[status].length === 0 && (
                   <div className="border-2 border-dashed border-white/[0.06] rounded-xl p-6 text-center">

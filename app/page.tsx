@@ -45,7 +45,7 @@ const MAX_ITEMS = 3;
 
 export default function EnterpriseDemoDashboard() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('allt');
-  const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
+  const [widgets, setWidgets] = useState<WidgetConfig[]>(loadWidgetPrefs());
   const [customizerOpen, setCustomizerOpen] = useState(false);
   const [expandedWidgets, setExpandedWidgets] = useState<Set<WidgetId>>(new Set());
   const [userName, setUserName] = useState<string>('');
@@ -55,10 +55,6 @@ export default function EnterpriseDemoDashboard() {
   const [malList, setMalList] = useState<Mal[]>(mal);
   const router = useRouter();
   const verkefniStore = useVerkefniStore();
-
-  useEffect(() => {
-    setWidgets(loadWidgetPrefs());
-  }, []);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -163,13 +159,13 @@ export default function EnterpriseDemoDashboard() {
       .sort((a, b) => a.deadline.localeCompare(b.deadline));
   }, [today]);
 
-  const allVerkefniOpin = useMemo(() =>
+  const allVerkefniActive = useMemo(() =>
     verkefni.filter(v => v.status !== 'lokið').sort((a, b) => a.deadline.localeCompare(b.deadline)),
   []);
 
-  const verkefniIGangi = useMemo(() => allVerkefniOpin.filter(v => v.status === 'í gangi'), [allVerkefniOpin]);
-  const verkefniOpin = useMemo(() => allVerkefniOpin.filter(v => v.status === 'opið'), [allVerkefniOpin]);
-  const minVerkefniActive = minVerkefniTab === 'uthlutad' ? verkefniIGangi : verkefniOpin;
+  const verkefniIGangi = useMemo(() => allVerkefniActive.filter(v => v.status === 'í gangi'), [allVerkefniActive]);
+  const verkefniStofnud = useMemo(() => allVerkefniActive.filter(v => v.status === 'opið'), [allVerkefniActive]);
+  const minVerkefniActive = minVerkefniTab === 'uthlutad' ? verkefniIGangi : verkefniStofnud;
 
   const iLeigu = filteredBilar.filter(b => b.status === 'í leigu').length;
   const lausir = filteredBilar.filter(b => b.status === 'laus').length;
@@ -228,7 +224,7 @@ export default function EnterpriseDemoDashboard() {
                 : 'text-white/40 hover:text-white/60'
             }`}
           >
-            Opin ({verkefniOpin.length})
+            Stofnuð ({verkefniStofnud.length})
           </button>
         </div>
         <WidgetList
@@ -236,7 +232,7 @@ export default function EnterpriseDemoDashboard() {
           maxItems={MAX_ITEMS}
           expanded={expandedWidgets.has('minVerkefni')}
           onToggle={() => toggleExpand('minVerkefni')}
-          empty={minVerkefniTab === 'uthlutad' ? 'Engin verkefni í gangi' : 'Engin opin verkefni'}
+          empty={minVerkefniTab === 'uthlutad' ? 'Engin verkefni í gangi' : 'Engin stofnuð verkefni'}
           renderItem={v => {
             const checkDone = v.checklist.filter(c => c.lokid).length;
             const checkTotal = v.checklist.length;
@@ -526,7 +522,7 @@ export default function EnterpriseDemoDashboard() {
   };
 
   const widgetMeta: Record<WidgetId, { badge?: number; badgeColor?: string; accentColor: string; link?: string; linkLabel?: string; totalItems?: number }> = {
-    minVerkefni: { badge: allVerkefniOpin.length, badgeColor: '#8b5cf6', accentColor: '#8b5cf6', link: '/verkefnalisti', linkLabel: 'Sjá öll →', totalItems: minVerkefniActive.length },
+    minVerkefni: { badge: allVerkefniActive.length, badgeColor: '#8b5cf6', accentColor: '#8b5cf6', link: '/verkefnalisti', linkLabel: 'Sjá öll →', totalItems: minVerkefniActive.length },
     verkefniDagsins: { badge: verkefniDagsins.length, badgeColor: '#3b82f6', accentColor: '#3b82f6', link: '/verkefnalisti', linkLabel: 'Sjá öll →', totalItems: verkefniDagsins.length },
     verkefniFramundan: { badge: verkefniFramundan.length, badgeColor: '#f59e0b', accentColor: '#f59e0b', link: '/verkefnalisti', linkLabel: 'Sjá öll →', totalItems: verkefniFramundan.length },
     samningarRennaUt: { badge: rennaUt.length, badgeColor: '#ef4444', accentColor: '#ef4444', link: '/samningar', linkLabel: 'Sjá alla →', totalItems: rennaUt.length },
@@ -599,7 +595,7 @@ export default function EnterpriseDemoDashboard() {
       {/* Compact Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard label="Virkir samningar" value={virkirSamningar.length.toString()} sub={formatCurrency(manadalegurTekjur) + '/m'} accent="#3b82f6" href="/samningar" />
-        <StatCard label="Bílar í notkun" value={`${iLeigu}`} sub={`${lausir} lausir · ${iThjonustu} þjón.`} accent="#8b5cf6" href="/bilar" />
+        <StatCard label="Bílar í notkun" value={`${iLeigu}`} sub={`${lausir} lausir`} accent="#8b5cf6" href="/bilar" subLink={{ label: `${iThjonustu} í þjónustu`, href: '/thjonusta' }} />
         <StatCard label="Skil 30d" value={rennaUt.length.toString()} sub={rennaUt.length > 0 ? 'Renna út' : 'Ekkert'} accent="#f59e0b" href="/samningar" />
         <StatCard label="Opin mál" value={malIVinnslu.length.toString()} sub={`${mal.filter(m => m.forgangur === 'hár' || m.forgangur === 'bráður').length} hár forg.`} accent="#ef4444" href="/malaskraning" />
         <StatCard label="Sölurás" value={formatCurrency(stats.pipalineVerdmaeti)} sub={`${nySolutaekifaeri.length} ný`} accent="#22c55e" href="/solutaekifaeri" />
@@ -664,14 +660,29 @@ export default function EnterpriseDemoDashboard() {
 
 /* ─── Compact StatCard ─── */
 
-function StatCard({ label, value, sub, accent, href }: {
+function StatCard({ label, value, sub, accent, href, subLink }: {
   label: string; value: string; sub: string; accent: string; href?: string;
+  subLink?: { label: string; href: string };
 }) {
   const content = (
     <>
       <div className="text-[11px] font-medium text-white/40 mb-1">{label}</div>
       <div className="text-xl font-bold" style={{ color: accent }}>{value}</div>
-      <div className="text-[11px] text-white/30 mt-1">{sub}</div>
+      <div className="text-[11px] text-white/30 mt-1">
+        {sub}
+        {subLink && (
+          <>
+            {' · '}
+            <Link
+              href={subLink.href}
+              onClick={(e) => e.stopPropagation()}
+              className="text-amber-400/70 hover:text-amber-400 transition-colors"
+            >
+              {subLink.label}
+            </Link>
+          </>
+        )}
+      </div>
     </>
   );
 

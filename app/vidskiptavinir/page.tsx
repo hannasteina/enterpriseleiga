@@ -73,6 +73,7 @@ export default function VidskiptavinirPage() {
   const [sendSubject, setSendSubject] = useState('');
   const [sendBody, setSendBody] = useState('');
   const [sendLoading, setSendLoading] = useState(false);
+  const [sendTemplate, setSendTemplate] = useState<'none' | 'golfmot'>('none');
   const [toast, setToast] = useState('');
 
   useEffect(() => {
@@ -219,19 +220,23 @@ export default function VidskiptavinirPage() {
   }
 
   async function handleSendEmail() {
-    if (!sendSubject.trim() || !sendBody.trim() || selectedContacts.length === 0) return;
+    const isGolf = sendTemplate === 'golfmot';
+    if (!isGolf && (!sendSubject.trim() || !sendBody.trim())) return;
+    if (selectedContacts.length === 0) return;
     setSendLoading(true);
     try {
       const res = await fetch('/api/send-bulk-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipients: selectedContacts.map(({ tengiliður: t }) => ({
+          recipients: selectedContacts.map(({ tengiliður: t, fyrirtaeki: f }) => ({
             email: t.netfang,
             name: t.nafn,
+            fyrirtaeki: f.nafn,
           })),
-          subject: sendSubject,
-          body: sendBody,
+          subject: isGolf ? '' : sendSubject,
+          body: isGolf ? '' : sendBody,
+          templateId: isGolf ? 'golfmot' : undefined,
         }),
       });
       const data = await res.json();
@@ -239,6 +244,7 @@ export default function VidskiptavinirPage() {
       setShowSendModal(false);
       setSendSubject('');
       setSendBody('');
+      setSendTemplate('none');
     } catch {
       setToast('Villa við sendingu');
     } finally {
@@ -635,20 +641,20 @@ export default function VidskiptavinirPage() {
 
       {/* Send email modal */}
       {showSendModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowSendModal(false)}>
-          <div className="bg-[#0f1117] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg mx-4" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setShowSendModal(false); setSendTemplate('none'); }}>
+          <div className="bg-[#0f1117] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
               <div>
                 <h3 className="text-base font-bold text-white">Senda tölvupóst</h3>
                 <p className="text-xs text-white/40 mt-0.5">Á {selectedContacts.length} valda tengiliði</p>
               </div>
-              <button onClick={() => setShowSendModal(false)} className="text-white/40 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
+              <button onClick={() => { setShowSendModal(false); setSendTemplate('none'); }} className="text-white/40 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <div className="px-6 py-5 space-y-4">
+            <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
               <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
                 {selectedContacts.map(({ tengiliður: t }) => (
                   <span key={t.id} className="text-[10px] px-2 py-1 rounded-full bg-blue-500/10 text-blue-400 font-medium">
@@ -656,48 +662,129 @@ export default function VidskiptavinirPage() {
                   </span>
                 ))}
               </div>
+
+              {/* Template picker */}
               <div>
-                <label className="block text-xs font-medium text-white/50 mb-1">Efni</label>
-                <input
-                  value={sendSubject}
-                  onChange={e => setSendSubject(e.target.value)}
-                  placeholder="Efni tölvupósts..."
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
-                />
+                <label className="block text-xs font-medium text-white/50 mb-2">Sniðmát</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSendTemplate('none')}
+                    className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-medium transition-all border ${
+                      sendTemplate === 'none'
+                        ? 'bg-blue-600/15 border-blue-500/30 text-blue-400'
+                        : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70 hover:border-white/20'
+                    }`}
+                  >
+                    <svg className="w-4 h-4 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                    </svg>
+                    Eigin póstur
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSendTemplate('golfmot')}
+                    className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-medium transition-all border ${
+                      sendTemplate === 'golfmot'
+                        ? 'bg-emerald-600/15 border-emerald-500/30 text-emerald-400'
+                        : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70 hover:border-white/20'
+                    }`}
+                  >
+                    <span className="text-base block mb-0.5">⛳</span>
+                    Golfmót {new Date().getFullYear()}
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-white/50 mb-1">
-                  Meginmál <span className="text-white/30 font-normal">({'{{nafn}}'} = nafn viðtakanda)</span>
-                </label>
-                <textarea
-                  value={sendBody}
-                  onChange={e => setSendBody(e.target.value)}
-                  rows={6}
-                  placeholder="Sæll/sæl {{nafn}},&#10;&#10;..."
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 resize-none"
-                />
-              </div>
+
+              {sendTemplate === 'golfmot' ? (
+                /* Golf template preview */
+                <div className="rounded-xl border border-emerald-500/20 overflow-hidden">
+                  <div className="bg-gradient-to-br from-emerald-900 to-emerald-700 px-5 py-4 text-center">
+                    <span className="text-3xl">⛳</span>
+                    <h4 className="text-white font-bold text-sm mt-2">Golfmót Enterprise {new Date().getFullYear()}</h4>
+                    <p className="text-emerald-300/80 text-[10px] mt-1 uppercase tracking-wider">Boðsmiði með skráningarhnappi</p>
+                  </div>
+                  <div className="bg-emerald-500/[0.04] px-5 py-4 space-y-3">
+                    <p className="text-xs text-white/60 leading-relaxed">
+                      Hver viðtakandi fær persónulegan póst með sínu nafni og
+                      skráningarhnappi sem opnar skráningarsíðu með fyrirfylltum upplýsingum.
+                    </p>
+                    <div className="flex items-center gap-3 text-[10px] text-white/40">
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                        Persónulegur
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                        Skráningarhnappur
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                        Myndrænt
+                      </span>
+                    </div>
+                    <div className="bg-white/5 rounded-lg p-3 text-[10px] text-white/40 space-y-1.5">
+                      <div className="flex gap-2"><span className="text-emerald-400 font-mono w-9 shrink-0">08:30</span><span>Skráning og morgunverður</span></div>
+                      <div className="flex gap-2"><span className="text-emerald-400 font-mono w-9 shrink-0">09:30</span><span>Kynning á nýjum bílalínum</span></div>
+                      <div className="flex gap-2"><span className="text-emerald-400 font-mono w-9 shrink-0">10:00</span><span>Mótið hefst — Best ball, 4 manna teymi</span></div>
+                      <div className="flex gap-2"><span className="text-emerald-400 font-mono w-9 shrink-0">15:00</span><span>Hádegisverður og verðlaunaafhending</span></div>
+                      <div className="flex gap-2"><span className="text-emerald-400 font-mono w-9 shrink-0">16:30</span><span>Netþing og sýning á rafbílum</span></div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Custom email form */
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-white/50 mb-1">Efni</label>
+                    <input
+                      value={sendSubject}
+                      onChange={e => setSendSubject(e.target.value)}
+                      placeholder="Efni tölvupósts..."
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-white/50 mb-1">
+                      Meginmál <span className="text-white/30 font-normal">({'{{nafn}}'} = nafn viðtakanda)</span>
+                    </label>
+                    <textarea
+                      value={sendBody}
+                      onChange={e => setSendBody(e.target.value)}
+                      rows={6}
+                      placeholder="Sæll/sæl {{nafn}},&#10;&#10;..."
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 resize-none"
+                    />
+                  </div>
+                </>
+              )}
             </div>
-            <div className="px-6 py-4 border-t border-white/5 flex justify-end gap-2">
+            <div className="px-6 py-4 border-t border-white/5 flex justify-end gap-2 shrink-0">
               <button
-                onClick={() => setShowSendModal(false)}
+                onClick={() => { setShowSendModal(false); setSendTemplate('none'); }}
                 className="px-4 py-2 rounded-lg text-sm text-white/50 hover:text-white/70 transition-colors"
               >
                 Hætta við
               </button>
               <button
                 onClick={handleSendEmail}
-                disabled={sendLoading || !sendSubject.trim() || !sendBody.trim()}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors inline-flex items-center gap-2"
+                disabled={sendLoading || (sendTemplate === 'none' && (!sendSubject.trim() || !sendBody.trim()))}
+                className={`px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors inline-flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed ${
+                  sendTemplate === 'golfmot'
+                    ? 'bg-emerald-600 hover:bg-emerald-500'
+                    : 'bg-blue-600 hover:bg-blue-500'
+                }`}
               >
                 {sendLoading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : sendTemplate === 'golfmot' ? (
+                  <span>⛳</span>
                 ) : (
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                   </svg>
                 )}
-                Senda
+                {sendTemplate === 'golfmot' ? 'Senda golfmótsboð' : 'Senda'}
               </button>
             </div>
           </div>

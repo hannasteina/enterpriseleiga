@@ -8,10 +8,15 @@ import {
   getFyrirtaeki,
   getStatusColor,
   getStatusBg,
+  virktThjonustuverk,
+  getVirktThjonustuverk,
+  thpilaThjonustuFerill,
   type Thjonustuaminning,
   type Bill,
   type Fyrirtaeki,
+  type VirktThjonustuverk,
 } from '@/lib/enterprise-demo-data';
+import SetjaIThjonustuModal from '@/components/SetjaIThjonustuModal';
 
 type StatusFilter =
   | 'allar'
@@ -146,6 +151,9 @@ export default function ThjonustaPage() {
   const [workflowModal, setWorkflowModal] = useState(false);
   const [workflows, setWorkflows] = useState<WorkflowSnidmat[]>(DEFAULT_WORKFLOWS);
   const [editingWorkflow, setEditingWorkflow] = useState<WorkflowSnidmat | null>(null);
+  const [bilarIThjonustu, setBilarIThjonustu] = useState<VirktThjonustuverk[]>([...virktThjonustuverk]);
+  const [ljukaPrompt, setLjukaPrompt] = useState<{ aminningId: string; verk: VirktThjonustuverk; bill: Bill } | null>(null);
+  const [thjonustuBillFromAminning, setThjonustuBillFromAminning] = useState<Bill | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -167,6 +175,17 @@ export default function ThjonustaPage() {
   function handleStatusChange(id: string, newStatus: Thjonustuaminning['status']) {
     setAminningar(prev => prev.map(a => a.id === id ? { ...a, status: newStatus } : a));
     showToast(`Staða breytt í: ${STATUS_LABELS[newStatus]}`);
+
+    if (newStatus === 'lokið') {
+      const aminning = aminningar.find(a => a.id === id);
+      if (aminning) {
+        const verk = getVirktThjonustuverk(aminning.billId);
+        const bill = bilar.find(b => b.id === aminning.billId);
+        if (verk && bill) {
+          setLjukaPrompt({ aminningId: id, verk, bill });
+        }
+      }
+    }
   }
 
   function openSendingModal(a: Thjonustuaminning) {
@@ -233,6 +252,39 @@ export default function ThjonustaPage() {
 
   function getLogsForAminning(id: string) {
     return sendingLogs.filter(l => l.aminningId === id);
+  }
+
+  function handleLjukaFromPrompt() {
+    if (!ljukaPrompt) return;
+    handleLjukaThjonustuFraSidu(ljukaPrompt.verk);
+    setLjukaPrompt(null);
+  }
+
+  function handleSetjaIThjonustuFromAminning(verk: Omit<VirktThjonustuverk, 'id'>) {
+    const newVerk: VirktThjonustuverk = { ...verk, id: `vt-${Date.now()}` };
+    virktThjonustuverk.push(newVerk);
+    setBilarIThjonustu(prev => [...prev, newVerk]);
+    setThjonustuBillFromAminning(null);
+    const bil = bilar.find(b => b.id === verk.billId);
+    showToast(`${bil?.numer ?? 'Bíll'} settur í þjónustu`);
+  }
+
+  function handleLjukaThjonustuFraSidu(verk: VirktThjonustuverk) {
+    const bil = bilar.find(b => b.id === verk.billId);
+    thpilaThjonustuFerill.push({
+      id: `tf-${Date.now()}`,
+      billId: verk.billId,
+      dagsetning: new Date().toISOString().split('T')[0],
+      tegund: verk.tegund,
+      lysing: verk.lysing,
+      stadur: verk.stadur,
+      kostnadur: verk.kostnadur ?? 0,
+      km: verk.km ?? 0,
+    });
+    const idx = virktThjonustuverk.findIndex(v => v.id === verk.id);
+    if (idx !== -1) virktThjonustuverk.splice(idx, 1);
+    setBilarIThjonustu(prev => prev.filter(v => v.id !== verk.id));
+    showToast(`Þjónustu lokið — ${bil?.numer ?? 'bíll'} er laus aftur`);
   }
 
   const activeWorkflows = workflows.filter(w => w.virkt);
@@ -530,6 +582,58 @@ export default function ThjonustaPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Bílar í þjónustu */}
+          <div className="bg-[#161822] rounded-xl border border-amber-500/15 overflow-hidden">
+            <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <h2 className="text-sm font-semibold text-white">Bílar í þjónustu</h2>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
+                {bilarIThjonustu.length}
+              </span>
+            </div>
+            {bilarIThjonustu.length === 0 ? (
+              <div className="p-5 text-center text-xs text-white/30">Engir bílar í þjónustu</div>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {bilarIThjonustu.map(verk => {
+                  const bil = bilar.find(b => b.id === verk.billId);
+                  const dagsInni = new Date(verk.dagsInni);
+                  const dagarInni = Math.max(1, Math.ceil((Date.now() - dagsInni.getTime()) / (1000 * 60 * 60 * 24)));
+                  const skiladagur = new Date(verk.aaetladurSkiladagur);
+                  const dagarEftir = Math.ceil((skiladagur.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                  return (
+                    <div key={verk.id} className="p-4 hover:bg-white/[0.02] transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <Link href={bil ? `/bilar/${bil.id}` : '#'} className="flex items-center gap-2 group">
+                          <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{bil?.numer}</span>
+                          <span className="text-xs text-white/40">{bil?.tegund}</span>
+                        </Link>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          dagarEftir <= 0 ? 'bg-red-500/15 text-red-400' : dagarEftir <= 2 ? 'bg-amber-500/15 text-amber-400' : 'bg-white/5 text-white/40'
+                        }`}>
+                          {dagarEftir <= 0 ? 'Seint!' : `${dagarEftir}d eftir`}
+                        </span>
+                      </div>
+                      <div className="text-xs text-white/50 capitalize mb-1">{verk.tegund}</div>
+                      <div className="text-xs text-white/30 mb-2">{verk.stadur} · {dagarInni}d inni</div>
+                      <button
+                        onClick={() => handleLjukaThjonustuFraSidu(verk)}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600/15 text-green-400 text-xs font-medium hover:bg-green-600/25 transition-colors border border-green-500/20"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Ljúka þjónustu
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Active workflows summary */}
           <div className="bg-[#161822] rounded-xl border border-white/5 overflow-hidden">
             <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
@@ -636,6 +740,16 @@ export default function ThjonustaPage() {
         <NyAminningModal
           onClose={() => setNyAminningOpen(false)}
           onCreate={handleCreateAminning}
+          onSetjaIThjonustu={(bill) => setThjonustuBillFromAminning(bill)}
+        />
+      )}
+
+      {/* Setja í þjónustu modal (frá áminningu) */}
+      {thjonustuBillFromAminning && (
+        <SetjaIThjonustuModal
+          bill={thjonustuBillFromAminning}
+          onClose={() => setThjonustuBillFromAminning(null)}
+          onSubmit={handleSetjaIThjonustuFromAminning}
         />
       )}
 
@@ -663,6 +777,66 @@ export default function ThjonustaPage() {
         />
       )}
 
+      {/* Ljúka þjónustu prompt */}
+      {ljukaPrompt && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setLjukaPrompt(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="bg-[#161822] border border-white/10 rounded-2xl shadow-2xl w-full max-w-md animate-in slide-in-from-bottom-4 duration-200">
+              <div className="px-6 py-5 border-b border-white/5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-500/15 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Ljúka þjónustu?</h3>
+                  <p className="text-xs text-white/40 mt-0.5">
+                    {ljukaPrompt.bill.tegund} ({ljukaPrompt.bill.numer}) er í þjónustu
+                  </p>
+                </div>
+              </div>
+              <div className="px-6 py-4">
+                <p className="text-sm text-white/60 mb-4">
+                  Áminning merkt lokið. Viltu einnig ljúka þjónustu á bílnum og merkja hann lausan?
+                </p>
+                <div className="bg-white/[0.03] rounded-lg p-3 border border-white/5 text-xs text-white/50 space-y-1 mb-5">
+                  <div><span className="text-white/30">Tegund:</span> <span className="capitalize">{ljukaPrompt.verk.tegund}</span></div>
+                  <div><span className="text-white/30">Staður:</span> {ljukaPrompt.verk.stadur}</div>
+                  <div><span className="text-white/30">Inni síðan:</span> {ljukaPrompt.verk.dagsInni}</div>
+                </div>
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setLjukaPrompt(null)}
+                    className="px-4 py-2 text-sm text-white/50 hover:text-white transition-colors"
+                  >
+                    Nei, halda áfram
+                  </button>
+                  <button
+                    onClick={handleLjukaFromPrompt}
+                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Já, ljúka þjónustu
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Setja í þjónustu modal from reminder */}
+      {thjonustuBillFromAminning && (
+        <SetjaIThjonustuModal
+          bill={thjonustuBillFromAminning}
+          onClose={() => setThjonustuBillFromAminning(null)}
+          onSubmit={handleSetjaIThjonustuFromAminning}
+        />
+      )}
+
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#1a1d2e] border border-white/10 text-white text-sm px-4 py-3 rounded-lg shadow-xl animate-in slide-in-from-bottom-2 flex items-center gap-2">
@@ -681,15 +855,18 @@ export default function ThjonustaPage() {
 function NyAminningModal({
   onClose,
   onCreate,
+  onSetjaIThjonustu,
 }: {
   onClose: () => void;
   onCreate: (a: Thjonustuaminning) => void;
+  onSetjaIThjonustu?: (bill: Bill) => void;
 }) {
   const [billId, setBillId] = useState('');
   const [tegund, setTegund] = useState<Thjonustuaminning['tegund']>('þjónustuskoðun');
   const [dagsThjonustu, setDagsThjonustu] = useState('');
   const [dagsAminningar, setDagsAminningar] = useState('');
   const [billSearch, setBillSearch] = useState('');
+  const [setjaIThjonustu, setSetjaIThjonustu] = useState(false);
 
   const filteredBilar = useMemo(() => {
     if (!billSearch) return bilar.slice(0, 10);
@@ -722,6 +899,10 @@ function NyAminningModal({
       sendtViðskiptavini: false,
       innriTilkynning: false,
     });
+
+    if (setjaIThjonustu && selectedBil && onSetjaIThjonustu) {
+      onSetjaIThjonustu(selectedBil);
+    }
   }
 
   const isValid = billId && dagsThjonustu;
@@ -841,6 +1022,35 @@ function NyAminningModal({
                 className="w-full bg-[#0f1117] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/30"
               />
             </div>
+
+            {/* Setja í þjónustu toggle */}
+            {selectedBil && selectedBil.status === 'laus' && onSetjaIThjonustu && (
+              <div className={`rounded-xl border p-3 transition-colors ${
+                setjaIThjonustu
+                  ? 'border-amber-500/20 bg-amber-500/[0.03]'
+                  : 'border-white/5 bg-white/[0.01]'
+              }`}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={() => setSetjaIThjonustu(!setjaIThjonustu)}
+                    className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
+                      setjaIThjonustu ? 'bg-amber-600' : 'bg-white/10'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                      setjaIThjonustu ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                  </button>
+                  <div>
+                    <span className={`text-sm font-medium ${setjaIThjonustu ? 'text-amber-300' : 'text-white/50'}`}>
+                      Setja bíl í þjónustu
+                    </span>
+                    <p className="text-xs text-white/30 mt-0.5">Opnar þjónustuskýrslu eftir stofnun áminningar</p>
+                  </div>
+                </label>
+              </div>
+            )}
 
             {/* Submit */}
             <div className="flex items-center justify-end gap-3 pt-2">
