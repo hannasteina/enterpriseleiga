@@ -191,7 +191,7 @@ export default function NyttVerkefniModal({ store, currentUser, onClose, onCreat
                 className="w-full bg-[#161822] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 style={theme === 'light' ? { ...selectStyle, colorScheme: 'light' } : { colorScheme: 'dark' }}
               >
-                <option value="opið" style={theme === 'light' ? selectStyle : { background: '#1a1d2e', color: '#ffffff' }}>Opið</option>
+                <option value="opið" style={theme === 'light' ? selectStyle : { background: '#1a1d2e', color: '#ffffff' }}>Stofnuð</option>
                 <option value="í gangi" style={theme === 'light' ? selectStyle : { background: '#1a1d2e', color: '#ffffff' }}>Í gangi</option>
                 <option value="lokið" style={theme === 'light' ? selectStyle : { background: '#1a1d2e', color: '#ffffff' }}>Lokið</option>
               </select>

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -31,7 +32,11 @@ import {
   getNaestaThjonustur,
   getFyrirtaeki,
   type Svid,
+  type Mal,
 } from '@/lib/enterprise-demo-data';
+import { useVerkefniStore } from '@/lib/verkefni-store';
+import VerkefniDetailModal from '@/components/VerkefniDetailModal';
+import MalModal from '@/components/MalModal';
 
 type QuickFilter = 'allt' | 'langtimaleiga' | 'flotaleiga';
 type MinVerkefniTab = 'uthlutad' | 'stofnad';
@@ -45,6 +50,11 @@ export default function EnterpriseDemoDashboard() {
   const [expandedWidgets, setExpandedWidgets] = useState<Set<WidgetId>>(new Set());
   const [userName, setUserName] = useState<string>('');
   const [minVerkefniTab, setMinVerkefniTab] = useState<MinVerkefniTab>('uthlutad');
+  const [selectedVerkefniId, setSelectedVerkefniId] = useState<string | null>(null);
+  const [selectedMal, setSelectedMal] = useState<Mal | null>(null);
+  const [malList, setMalList] = useState<Mal[]>(mal);
+  const router = useRouter();
+  const verkefniStore = useVerkefniStore();
 
   useEffect(() => {
     setWidgets(loadWidgetPrefs());
@@ -52,19 +62,27 @@ export default function EnterpriseDemoDashboard() {
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: string, session: { user?: { id: string; email?: string } } | null) => {
-      const user = session?.user;
-      if (!user) return;
 
+    async function fetchUserName(user: { id: string; email?: string }) {
       const emailName = user.email?.split('@')[0] || '';
-
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('display_name')
         .eq('user_id', user.id)
         .single();
-
       setUserName(profile?.display_name || emailName);
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: { user?: { id: string; email?: string } } | null } }) => {
+      if (session?.user) fetchUserName(session.user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: string, session: { user?: { id: string; email?: string } } | null) => {
+      if (session?.user) {
+        fetchUserName(session.user);
+      } else {
+        setUserName('');
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -128,7 +146,7 @@ export default function EnterpriseDemoDashboard() {
 
   const thjonustur14 = useMemo(() => getNaestaThjonustur(14), []);
   const nySolutaekifaeri = useMemo(() => solutaekifaeri.filter(s => s.stig !== 'lokað tapað' && s.stig !== 'lokað unnið'), []);
-  const malIVinnslu = useMemo(() => mal.filter(m => m.status !== 'lokað'), []);
+  const malIVinnslu = useMemo(() => malList.filter(m => m.status !== 'lokað'), [malList]);
 
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
 
@@ -158,6 +176,33 @@ export default function EnterpriseDemoDashboard() {
   const iThjonustu = filteredBilar.filter(b => b.status === 'í þjónustu').length;
   const virkirSamningar = filteredSamningar.filter(s => s.status === 'virkur' || s.status === 'rennur_ut');
   const manadalegurTekjur = virkirSamningar.reduce((sum, s) => sum + s.manadalegurKostnadur, 0);
+
+  const selectedVerkefni = selectedVerkefniId
+    ? verkefniStore.getVerkefniById(selectedVerkefniId) ?? null
+    : null;
+
+  const currentUser = userName || 'Kristján';
+
+  const handleSendNotification = useCallback(async (verkefniId: string, tilNotandaId: string, skilabod: string) => {
+    const v = verkefniStore.getVerkefniById(verkefniId);
+    try {
+      await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          verkefniTitill: v?.titill ?? '',
+          tilNotandaId,
+          fraNafn: currentUser,
+          skilabod,
+        }),
+      });
+    } catch { /* silent */ }
+  }, [verkefniStore, currentUser]);
+
+  const handleMalSave = useCallback((updatedMal: Mal) => {
+    setMalList(prev => prev.map(m => m.id === updatedMal.id ? updatedMal : m));
+    setSelectedMal(null);
+  }, []);
 
   const visibleWidgets = widgets.filter(w => w.visible);
 
@@ -197,7 +242,7 @@ export default function EnterpriseDemoDashboard() {
             const checkTotal = v.checklist.length;
             const progress = checkTotal > 0 ? Math.round((checkDone / checkTotal) * 100) : 0;
             return (
-              <div key={v.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
+              <div key={v.id} onClick={() => setSelectedVerkefniId(v.id)} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.04] transition-colors border-b border-white/5 last:border-0 cursor-pointer">
                 <ItemIcon type={v.sjálfvirkt ? 'auto' : 'task'} color="#8b5cf6" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-white/80 truncate">{v.titill}</div>
@@ -210,7 +255,7 @@ export default function EnterpriseDemoDashboard() {
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: getStatusBg(v.status), color: getStatusColor(v.status) }}>
-                    {v.status === 'í gangi' ? 'Í gangi' : v.status === 'opið' ? 'Opið' : v.status}
+                    {v.status === 'í gangi' ? 'Í gangi' : v.status === 'opið' ? 'Stofnuð' : v.status}
                   </span>
                   {checkTotal > 0 && (
                     <div className="w-12 h-1 rounded-full bg-white/5 overflow-hidden">
@@ -233,7 +278,7 @@ export default function EnterpriseDemoDashboard() {
         onToggle={() => toggleExpand('verkefniDagsins')}
         empty="Engin verkefni í dag"
         renderItem={v => (
-          <div key={v.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
+          <div key={v.id} onClick={() => setSelectedVerkefniId(v.id)} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.04] transition-colors border-b border-white/5 last:border-0 cursor-pointer">
             <ItemIcon type={v.sjálfvirkt ? 'auto' : 'task'} color="#3b82f6" />
             <div className="flex-1 min-w-0">
               <div className="text-sm text-white/80 truncate">{v.titill}</div>
@@ -258,7 +303,7 @@ export default function EnterpriseDemoDashboard() {
           const dagar = Math.ceil((new Date(v.deadline).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24));
           const dagLabel = dagar === 1 ? 'á morgun' : `eftir ${dagar}d`;
           return (
-            <div key={v.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
+            <div key={v.id} onClick={() => setSelectedVerkefniId(v.id)} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.04] transition-colors border-b border-white/5 last:border-0 cursor-pointer">
               <ItemIcon type={v.sjálfvirkt ? 'auto' : 'task'} color="#f59e0b" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white/80 truncate">{v.titill}</div>
@@ -289,7 +334,7 @@ export default function EnterpriseDemoDashboard() {
           const f = getFyrirtaeki(s.fyrirtaekiId);
           const dagar = Math.ceil((new Date(s.lokadagur).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
           return (
-            <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
+            <div key={s.id} onClick={() => router.push('/samningar')} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.04] transition-colors border-b border-white/5 last:border-0 cursor-pointer">
               <ItemIcon type="contract" color={dagar <= 14 ? '#ef4444' : '#f59e0b'} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -318,7 +363,7 @@ export default function EnterpriseDemoDashboard() {
           const bill = bilar.find(b => b.id === t.billId);
           const daysUntil = Math.ceil((new Date(t.dagsThjonustu).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
           return (
-            <div key={t.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
+            <div key={t.id} onClick={() => router.push('/thjonusta')} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.04] transition-colors border-b border-white/5 last:border-0 cursor-pointer">
               <ItemIcon type="service" color="#14b8a6" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white/80 truncate">{bill?.tegund}</div>
@@ -343,7 +388,7 @@ export default function EnterpriseDemoDashboard() {
         renderItem={s => {
           const f = getFyrirtaeki(s.fyrirtaekiId);
           return (
-            <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
+            <div key={s.id} onClick={() => router.push('/solutaekifaeri')} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.04] transition-colors border-b border-white/5 last:border-0 cursor-pointer">
               <ItemIcon type="sales" color="#22c55e" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-white truncate">{s.titill}</div>
@@ -371,7 +416,7 @@ export default function EnterpriseDemoDashboard() {
         renderItem={m => {
           const f = getFyrirtaeki(m.fyrirtaekiId);
           return (
-            <div key={m.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
+            <div key={m.id} onClick={() => setSelectedMal(m)} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.04] transition-colors border-b border-white/5 last:border-0 cursor-pointer">
               <ItemIcon type="case" color={m.forgangur === 'bráður' ? '#ef4444' : m.forgangur === 'hár' ? '#f59e0b' : '#3b82f6'} />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white/80 truncate">{m.titill}</div>
@@ -510,9 +555,13 @@ export default function EnterpriseDemoDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">
-            Stjórnborð{userName && <span className="text-white/50 font-normal"> – {userName}</span>}
+            Stjórnborð
           </h1>
-          <p className="text-xs text-white/30 mt-0.5">Enterprise Bílaleiga – Vatnsmýrarvegur 10, Reykjavík</p>
+          {userName ? (
+            <p className="text-sm text-white/50 mt-0.5">Góðan daginn, {userName}</p>
+          ) : (
+            <p className="text-xs text-white/30 mt-0.5">Enterprise Bílaleiga – Vatnsmýrarvegur 10, Reykjavík</p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <div className="flex rounded-lg border border-white/5 overflow-hidden bg-[#161822]">
@@ -589,6 +638,26 @@ export default function EnterpriseDemoDashboard() {
         onToggle={handleToggle}
         onReorder={handleReorder}
       />
+
+      {/* Verkefni Detail Modal */}
+      {selectedVerkefni && (
+        <VerkefniDetailModal
+          verkefni={selectedVerkefni}
+          store={verkefniStore}
+          currentUser={currentUser}
+          onClose={() => setSelectedVerkefniId(null)}
+          onSendNotification={handleSendNotification}
+        />
+      )}
+
+      {/* Mál Modal */}
+      {selectedMal && (
+        <MalModal
+          mal={selectedMal}
+          onClose={() => setSelectedMal(null)}
+          onSave={handleMalSave}
+        />
+      )}
     </div>
   );
 }

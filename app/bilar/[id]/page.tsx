@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import {
   bilar,
   samningsSkjol,
@@ -18,6 +18,67 @@ import {
   type SamningsSkjal,
   type Svid,
 } from '@/lib/enterprise-demo-data';
+
+interface LeiguferliSkref {
+  id: string;
+  stig: string;
+  nafn: string;
+  lysing: string;
+  dagarOffset: number;
+  offsetFra: 'upphaf' | 'lok';
+  adgerd: 'email' | 'sms' | 'innri' | 'verkefni';
+  sjalfvirkt: boolean;
+}
+
+interface LeiguferliSnidmat {
+  id: string;
+  nafn: string;
+  lysing: string;
+  skref: LeiguferliSkref[];
+}
+
+const STADLAD_LEIGUFERLI: LeiguferliSnidmat = {
+  id: 'lf-stadlad',
+  nafn: 'Staðlað leiguferli',
+  lysing: 'Sjálfvirkt ferli frá undirritun samnings til skila',
+  skref: [
+    { id: 'ls1', stig: 'samningur_undirritadur', nafn: 'Samningur undirritaður', lysing: 'Samningur sendur og undirritaður', dagarOffset: 0, offsetFra: 'upphaf', adgerd: 'verkefni', sjalfvirkt: false },
+    { id: 'ls2', stig: 'bill_afhentur', nafn: 'Bíll afhentur', lysing: 'Bíll afhentur til viðskiptavinar', dagarOffset: 0, offsetFra: 'upphaf', adgerd: 'verkefni', sjalfvirkt: false },
+    { id: 'ls3', stig: 'eftirfylgni_3d', nafn: 'Eftirfylgni (3 dagar)', lysing: 'Sjálfvirkur tölvupóstur: Er allt í lagi með bílinn?', dagarOffset: 3, offsetFra: 'upphaf', adgerd: 'email', sjalfvirkt: true },
+    { id: 'ls4', stig: 'anaegjukonnun', nafn: 'Ánægjukönnun', lysing: 'Sjálfvirk könnun send á viðskiptavin', dagarOffset: 14, offsetFra: 'upphaf', adgerd: 'email', sjalfvirkt: true },
+    { id: 'ls5', stig: 'aminning_60d', nafn: 'Áminning um lok (60 dagar)', lysing: 'Innri áminning: Samningur rennur út innan 60 daga', dagarOffset: -60, offsetFra: 'lok', adgerd: 'innri', sjalfvirkt: true },
+    { id: 'ls6', stig: 'tilkynning_30d', nafn: 'Tilkynning til viðskiptavinar (30 dagar)', lysing: 'Tölvupóstur til viðskiptavinar um lok samnings', dagarOffset: -30, offsetFra: 'lok', adgerd: 'email', sjalfvirkt: true },
+    { id: 'ls7', stig: 'skil_a_bil', nafn: 'Skil á bíl', lysing: 'Bíll skilað og ástandsskoðun', dagarOffset: 0, offsetFra: 'lok', adgerd: 'verkefni', sjalfvirkt: false },
+    { id: 'ls8', stig: 'samningur_lokid', nafn: 'Samningi lokið', lysing: 'Lokauppgjör og samningur lokað', dagarOffset: 0, offsetFra: 'lok', adgerd: 'verkefni', sjalfvirkt: false },
+  ],
+};
+
+const ADGERD_ICONS: Record<string, { color: string; bg: string; label: string }> = {
+  email: { color: '#3b82f6', bg: '#3b82f620', label: 'Tölvupóstur' },
+  sms: { color: '#22c55e', bg: '#22c55e20', label: 'SMS' },
+  innri: { color: '#f59e0b', bg: '#f59e0b20', label: 'Innri áminning' },
+  verkefni: { color: '#a78bfa', bg: '#a78bfa20', label: 'Verkefni' },
+};
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+function formatDateIS(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('is-IS', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+interface AktiftFerliSkref {
+  skref: LeiguferliSkref;
+  dagsetning: string;
+  status: 'lokið' | 'í gangi' | 'bíður' | 'áætlað';
+}
 
 export default function BillDetailPage() {
   const params = useParams();
@@ -44,8 +105,11 @@ export default function BillDetailPage() {
   const [assignTryggingar, setAssignTryggingar] = useState<'Enterprise' | 'Plús' | 'Úrvals'>('Enterprise');
   const [assignAkstur, setAssignAkstur] = useState('1300');
   const [assignAthugasemdir, setAssignAthugasemdir] = useState('');
+  const [assignFerliVirkt, setAssignFerliVirkt] = useState(true);
   const [assignResult, setAssignResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [assigned, setAssigned] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [aktivtFerli, setAktivtFerli] = useState<AktiftFerliSkref[] | null>(null);
 
   const fyrirtaeki = car?.fyrirtaekiId ? getFyrirtaeki(car.fyrirtaekiId) : null;
   const samningur = car?.samningurId ? getSamningur(car.samningurId) : null;
@@ -55,8 +119,40 @@ export default function BillDetailPage() {
     return fyrirtaeki.tengiliðir || [];
   }, [fyrirtaeki]);
 
+  const ferliSkrefMedDagsetningum = useMemo(() => {
+    if (!assignUpphafsdagur || !assignLokadagur) return [];
+    return STADLAD_LEIGUFERLI.skref.map(skref => {
+      const base = skref.offsetFra === 'upphaf' ? assignUpphafsdagur : assignLokadagur;
+      const dagsetning = addDays(base, skref.dagarOffset);
+      return { skref, dagsetning, status: 'áætlað' as const };
+    }).sort((a, b) => new Date(a.dagsetning).getTime() - new Date(b.dagsetning).getTime());
+  }, [assignUpphafsdagur, assignLokadagur]);
+
   const shouldAutoOpenAssign = searchParams.get('uthluta') === 'true';
   const [autoOpenedAssign, setAutoOpenedAssign] = useState(false);
+
+  const handleAssign = useCallback(() => {
+    if (!car || !assignFyrirtaekiId || !assignUpphafsdagur || !assignLokadagur || !assignKostnadur) return;
+    const fyrirtaekiNafn = allFyrirtaeki.find(f => f.id === assignFyrirtaekiId)?.nafn || '';
+
+    if (assignFerliVirkt && ferliSkrefMedDagsetningum.length > 0) {
+      const ferli = ferliSkrefMedDagsetningum.map((s, i) => ({
+        ...s,
+        status: (i === 0 ? 'í gangi' : 'áætlað') as AktiftFerliSkref['status'],
+      }));
+      setAktivtFerli(ferli);
+      setAssignResult({
+        ok: true,
+        message: `Bíll ${car.numer} úthlutaður til ${fyrirtaekiNafn} — leiguferli virkjað með ${ferli.length} skrefum`,
+      });
+    } else {
+      setAssignResult({
+        ok: true,
+        message: `Bíll ${car.numer} hefur verið úthlutaður til ${fyrirtaekiNafn}`,
+      });
+    }
+    setAssigned(true);
+  }, [car, assignFyrirtaekiId, assignUpphafsdagur, assignLokadagur, assignKostnadur, assignFerliVirkt, ferliSkrefMedDagsetningum]);
 
   useEffect(() => {
     if (shouldAutoOpenAssign && car && car.status === 'laus' && !assigned && !autoOpenedAssign) {
@@ -145,16 +241,6 @@ export default function BillDetailPage() {
     setAssignAthugasemdir('');
     setAssignResult(null);
     setAssignPanelOpen(true);
-  };
-
-  const handleAssign = () => {
-    if (!assignFyrirtaekiId || !assignUpphafsdagur || !assignLokadagur || !assignKostnadur) return;
-    const fyrirtaekiNafn = allFyrirtaeki.find(f => f.id === assignFyrirtaekiId)?.nafn || '';
-    setAssignResult({
-      ok: true,
-      message: `Bíll ${car.numer} hefur verið úthlutaður til ${fyrirtaekiNafn}`,
-    });
-    setAssigned(true);
   };
 
   const assignFormValid = assignFyrirtaekiId && assignUpphafsdagur && assignLokadagur && assignKostnadur;
@@ -591,6 +677,91 @@ export default function BillDetailPage() {
               />
             </div>
 
+            {/* Leiguferli toggle */}
+            <div className={`rounded-xl border overflow-hidden transition-all ${
+              assignFerliVirkt
+                ? 'border-purple-500/20 bg-purple-500/[0.03]'
+                : 'border-white/5 bg-white/[0.01]'
+            }`}>
+              <div className="px-4 py-3 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <svg className={`w-4 h-4 shrink-0 ${assignFerliVirkt ? 'text-purple-400' : 'text-white/30'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                    <span className={`text-sm font-medium ${assignFerliVirkt ? 'text-purple-300' : 'text-white/50'}`}>
+                      Virkja staðlað leiguferli
+                    </span>
+                    {assignFerliVirkt && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400">Virkt</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-white/40 mt-0.5 ml-6">
+                    Sjálfvirkt ferli með áminningum, eftirfylgni og verkefnum
+                  </p>
+                </div>
+                <button
+                  onClick={() => setAssignFerliVirkt(!assignFerliVirkt)}
+                  className={`w-10 h-5.5 rounded-full flex items-center transition-colors border shrink-0 ${
+                    assignFerliVirkt
+                      ? 'bg-purple-500/40 border-purple-500/30 justify-end'
+                      : 'bg-white/10 border-white/10 justify-start'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-full mx-0.5 shadow-sm ${assignFerliVirkt ? 'bg-white' : 'bg-white/50'}`} />
+                </button>
+              </div>
+
+              {assignFerliVirkt && ferliSkrefMedDagsetningum.length > 0 && (
+                <div className="px-4 pb-4 pt-1">
+                  <div className="space-y-0">
+                    {ferliSkrefMedDagsetningum.map((item, idx) => {
+                      const adgerd = ADGERD_ICONS[item.skref.adgerd] || ADGERD_ICONS.verkefni;
+                      const isLast = idx === ferliSkrefMedDagsetningum.length - 1;
+                      return (
+                        <div key={item.skref.id} className="flex gap-3 relative">
+                          {!isLast && (
+                            <div className="absolute left-[7px] top-[18px] bottom-0 w-px bg-white/10" />
+                          )}
+                          <div className="shrink-0 pt-1.5 z-10">
+                            <div
+                              className="w-[14px] h-[14px] rounded-full border-2"
+                              style={{ borderColor: adgerd.color, backgroundColor: adgerd.bg }}
+                            />
+                          </div>
+                          <div className="flex-1 pb-3 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-medium text-white/80">{item.skref.nafn}</span>
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                                style={{ backgroundColor: adgerd.bg, color: adgerd.color }}
+                              >
+                                {adgerd.label}
+                              </span>
+                              {item.skref.sjalfvirkt && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Sjálfvirkt</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[11px] text-white/40">{formatDateIS(item.dagsetning)}</span>
+                              <span className="text-[11px] text-white/30">•</span>
+                              <span className="text-[11px] text-white/30">{item.skref.lysing}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {assignFerliVirkt && (!assignUpphafsdagur || !assignLokadagur) && (
+                <div className="px-4 pb-3 pt-1">
+                  <p className="text-xs text-white/30 italic">Veldu upphafs- og lokadagsetningar til að sjá tímalínu ferlisins</p>
+                </div>
+              )}
+            </div>
+
             {/* Samantekt */}
             <div className="bg-white/[0.03] rounded-lg p-3 border border-white/5">
               <p className="text-[11px] font-medium text-white/30 mb-2 uppercase tracking-wide">Samantekt</p>
@@ -615,6 +786,12 @@ export default function BillDetailPage() {
                   <span className="text-white/40">Tryggingar:</span>
                   <span className="text-white ml-1">{assignTryggingar}</span>
                 </div>
+                {assignFerliVirkt && (
+                  <div>
+                    <span className="text-white/40">Ferli:</span>
+                    <span className="text-purple-400 ml-1">{STADLAD_LEIGUFERLI.nafn} ({STADLAD_LEIGUFERLI.skref.length} skref)</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -657,6 +834,130 @@ export default function BillDetailPage() {
                 Úthluta bíl
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Virkt leiguferli */}
+      {aktivtFerli && aktivtFerli.length > 0 && (
+        <div className="bg-[#161822] rounded-xl border border-purple-500/20 overflow-hidden shadow-lg shadow-purple-500/5">
+          <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              <h2 className="text-sm font-semibold text-white">Virkt leiguferli</h2>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400">{STADLAD_LEIGUFERLI.nafn}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-white/40">
+              <span>{aktivtFerli.filter(s => s.status === 'lokið').length}/{aktivtFerli.length} lokið</span>
+            </div>
+          </div>
+
+          <div className="px-5 py-3 flex items-center gap-2 border-b border-white/5 bg-purple-500/[0.02]">
+            <div className="h-1.5 flex-1 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-500"
+                style={{ width: `${(aktivtFerli.filter(s => s.status === 'lokið').length / aktivtFerli.length) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs text-white/50 shrink-0">
+              {Math.round((aktivtFerli.filter(s => s.status === 'lokið').length / aktivtFerli.length) * 100)}%
+            </span>
+          </div>
+
+          <div className="divide-y divide-white/5">
+            {aktivtFerli.map((item, idx) => {
+              const adgerd = ADGERD_ICONS[item.skref.adgerd] || ADGERD_ICONS.verkefni;
+              const isCompleted = item.status === 'lokið';
+              const isActive = item.status === 'í gangi';
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const stepDate = new Date(item.dagsetning);
+              stepDate.setHours(0, 0, 0, 0);
+              const daysUntil = Math.ceil((stepDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+              return (
+                <div
+                  key={item.skref.id}
+                  className={`px-5 py-3 flex items-center gap-4 transition-colors ${
+                    isActive ? 'bg-purple-500/[0.04]' : isCompleted ? 'bg-white/[0.01]' : 'hover:bg-white/[0.02]'
+                  }`}
+                >
+                  <button
+                    onClick={() => {
+                      setAktivtFerli(prev => {
+                        if (!prev) return prev;
+                        const updated = [...prev];
+                        if (updated[idx].status === 'lokið') {
+                          updated[idx] = { ...updated[idx], status: 'áætlað' };
+                        } else {
+                          updated[idx] = { ...updated[idx], status: 'lokið' };
+                        }
+                        const firstNotDone = updated.findIndex(s => s.status !== 'lokið');
+                        return updated.map((s, i) => ({
+                          ...s,
+                          status: s.status === 'lokið' ? 'lokið' : i === firstNotDone ? 'í gangi' : 'áætlað',
+                        }));
+                      });
+                    }}
+                    className={`w-5 h-5 rounded-md border-2 shrink-0 flex items-center justify-center transition-all ${
+                      isCompleted
+                        ? 'border-purple-500 bg-purple-500'
+                        : isActive
+                          ? 'border-purple-500/50 bg-purple-500/10'
+                          : 'border-white/15 hover:border-white/30'
+                    }`}
+                  >
+                    {isCompleted && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                    {isActive && (
+                      <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                    )}
+                  </button>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-medium ${isCompleted ? 'text-white/40 line-through' : 'text-white/80'}`}>
+                        {item.skref.nafn}
+                      </span>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: adgerd.bg, color: adgerd.color }}
+                      >
+                        {adgerd.label}
+                      </span>
+                      {item.skref.sjalfvirkt && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Sjálfvirkt</span>
+                      )}
+                    </div>
+                    <span className={`text-[11px] ${isCompleted ? 'text-white/25' : 'text-white/40'}`}>
+                      {item.skref.lysing}
+                    </span>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className={`text-xs ${isCompleted ? 'text-white/25' : 'text-white/60'}`}>
+                      {formatDateIS(item.dagsetning)}
+                    </div>
+                    {!isCompleted && (
+                      <div className={`text-[11px] mt-0.5 ${
+                        daysUntil < 0 ? 'text-red-400' :
+                        daysUntil === 0 ? 'text-amber-400' :
+                        daysUntil <= 7 ? 'text-amber-400/70' : 'text-white/30'
+                      }`}>
+                        {daysUntil < 0 ? `${Math.abs(daysUntil)} dögum síðan` :
+                         daysUntil === 0 ? 'Í dag' :
+                         `Eftir ${daysUntil} daga`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

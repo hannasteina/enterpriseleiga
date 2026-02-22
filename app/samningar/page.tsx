@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   samningar,
@@ -18,6 +18,10 @@ import {
 
 type TegundFilter = 'allir' | 'langtimaleiga' | 'flotaleiga';
 type StatusFilter = 'allir' | 'virkir' | 'rennur_ut' | 'lokid';
+type SortKey = 'fyrirtaeki' | 'tegund' | 'bill' | 'dagsetning' | 'kostnadur' | 'stada' | 'dagar';
+type SortDir = 'asc' | 'desc';
+
+const PAGE_SIZE = 15;
 
 const statusLabels: Record<string, string> = {
   virkur: 'Virkur',
@@ -41,10 +45,13 @@ export default function SamningarPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSamningur, setSelectedSamningur] = useState<Samningur | null>(null);
   const [samningarList, setSamningarList] = useState<Samningur[]>([...samningar]);
+  const [sortKey, setSortKey] = useState<SortKey>('dagar');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [page, setPage] = useState(0);
 
   const filteredSamningar = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return samningarList.filter((s) => {
+    const filtered = samningarList.filter((s) => {
       const tegundMatch =
         tegundFilter === 'allir' || s.tegund === tegundFilter;
       const statusMatch =
@@ -64,7 +71,43 @@ export default function SamningarPage() {
         s.lokadagur.includes(q)
       );
     });
-  }, [samningarList, tegundFilter, statusFilter, searchQuery]);
+
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'fyrirtaeki': {
+          const fA = getFyrirtaeki(a.fyrirtaekiId)?.nafn ?? '';
+          const fB = getFyrirtaeki(b.fyrirtaekiId)?.nafn ?? '';
+          cmp = fA.localeCompare(fB, 'is');
+          break;
+        }
+        case 'tegund':
+          cmp = a.tegund.localeCompare(b.tegund, 'is');
+          break;
+        case 'bill':
+          cmp = a.bilategund.localeCompare(b.bilategund, 'is');
+          break;
+        case 'dagsetning':
+          cmp = a.upphafsdagur.localeCompare(b.upphafsdagur);
+          break;
+        case 'kostnadur':
+          cmp = a.manadalegurKostnadur - b.manadalegurKostnadur;
+          break;
+        case 'stada': {
+          const order: Record<string, number> = { rennur_ut: 0, virkur: 1, lokid: 2, uppsagt: 3 };
+          cmp = (order[a.status] ?? 9) - (order[b.status] ?? 9);
+          break;
+        }
+        case 'dagar': {
+          const dA = getDaysRemaining(a.lokadagur) ?? 9999;
+          const dB = getDaysRemaining(b.lokadagur) ?? 9999;
+          cmp = dA - dB;
+          break;
+        }
+      }
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
+  }, [samningarList, tegundFilter, statusFilter, searchQuery, sortKey, sortDir]);
 
   const stats = useMemo(() => {
     const total = samningarList.length;
@@ -75,6 +118,23 @@ export default function SamningarPage() {
     const longTermCount = samningarList.filter((s) => s.tegund === 'langtimaleiga').length;
     return { total, monthlyRevenue, fleetCount, longTermCount };
   }, [samningarList]);
+
+  useEffect(() => setPage(0), [searchQuery, tegundFilter, statusFilter, sortKey, sortDir]);
+
+  const totalPages = Math.ceil(filteredSamningar.length / PAGE_SIZE);
+  const pagedSamningar = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return filteredSamningar.slice(start, start + PAGE_SIZE);
+  }, [filteredSamningar, page]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'fyrirtaeki' || key === 'tegund' || key === 'bill' ? 'asc' : 'desc');
+    }
+  };
 
   const verkefniBradlega = useMemo(() => {
     const now = new Date();
@@ -208,17 +268,35 @@ export default function SamningarPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-white/5">
-                    <th className="px-5 py-3 text-left text-xs font-medium text-white/40">Fyrirtæki</th>
-                    <th className="px-5 py-3 text-left text-xs font-medium text-white/40">Tegund</th>
-                    <th className="px-5 py-3 text-left text-xs font-medium text-white/40">Bíll</th>
-                    <th className="px-5 py-3 text-left text-xs font-medium text-white/40">Dagsetningar</th>
-                    <th className="px-5 py-3 text-left text-xs font-medium text-white/40">Mánaðarkostnaður</th>
-                    <th className="px-5 py-3 text-left text-xs font-medium text-white/40">Staða</th>
-                    <th className="px-5 py-3 text-left text-xs font-medium text-white/40">Dagar</th>
+                    {([
+                      { key: 'fyrirtaeki' as SortKey, label: 'Fyrirtæki' },
+                      { key: 'tegund' as SortKey, label: 'Tegund' },
+                      { key: 'bill' as SortKey, label: 'Bíll' },
+                      { key: 'dagsetning' as SortKey, label: 'Dagsetningar' },
+                      { key: 'kostnadur' as SortKey, label: 'Mánaðarkostnaður' },
+                      { key: 'stada' as SortKey, label: 'Staða' },
+                      { key: 'dagar' as SortKey, label: 'Dagar' },
+                    ]).map(col => (
+                      <th key={col.key} className="px-5 py-3 text-left">
+                        <button
+                          onClick={() => toggleSort(col.key)}
+                          className={`text-xs font-medium flex items-center gap-1 transition-colors ${
+                            sortKey === col.key ? 'text-blue-400' : 'text-white/40 hover:text-white/60'
+                          }`}
+                        >
+                          {col.label}
+                          {sortKey === col.key && (
+                            <svg className={`w-3 h-3 transition-transform ${sortDir === 'asc' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          )}
+                        </button>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredSamningar.map((s) => {
+                  {pagedSamningar.map((s) => {
                     const f = getFyrirtaeki(s.fyrirtaekiId);
                     const dagar = getDaysRemaining(s.lokadagur);
                     return (
@@ -286,7 +364,7 @@ export default function SamningarPage() {
                 </tbody>
               </table>
             </div>
-            {filteredSamningar.length === 0 && (
+            {pagedSamningar.length === 0 && (
               <div className="px-5 py-12 text-center">
                 <div className="text-sm text-white/30">Engir samningar fundust</div>
                 {searchQuery && (
@@ -300,6 +378,34 @@ export default function SamningarPage() {
               </div>
             )}
           </div>
+
+          {totalPages > 1 && (
+            <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between">
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-xs font-medium text-white/50 hover:text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+                Fyrri
+              </button>
+              <span className="text-xs text-white/30">
+                Síða {page + 1} af {totalPages} · {filteredSamningar.length} samningar
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-xs font-medium text-white/50 hover:text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                Næsta
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
 
         <div>

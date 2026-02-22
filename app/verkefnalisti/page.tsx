@@ -45,7 +45,7 @@ const deildLabels: Record<string, string> = {
 };
 
 const statusLabels: Record<string, string> = {
-  opið: 'Opið',
+  opið: 'Stofnuð',
   'í gangi': 'Í gangi',
   lokið: 'Lokið',
 };
@@ -340,18 +340,11 @@ function ListRow({ v, onClick }: { v: Verkefni; onClick: () => void }) {
 
       {/* Title + description */}
       <td className="py-3 px-3">
-        <div className="flex items-center gap-2">
-          {v.sjálfvirkt && (
-            <svg className="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          )}
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-white group-hover:text-blue-300 transition-colors truncate max-w-[280px]">
-              {v.titill}
-            </div>
-            <div className="text-[11px] text-white/35 truncate max-w-[280px]">{v.lýsing}</div>
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-white group-hover:text-blue-300 transition-colors truncate max-w-[280px]">
+            {v.titill}
           </div>
+          <div className="text-[11px] text-white/35 truncate max-w-[280px]">{v.lýsing}</div>
         </div>
       </td>
 

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import {
   fyrirtaeki,
   markhópar as allMarkhópar,
+  DEFAULT_AHUGAMAL,
   type Fyrirtaeki,
   type Svid,
   type Tengiliður,
@@ -64,6 +65,7 @@ export default function VidskiptavinirPage() {
   const [tSvidFilter, setTSvidFilter] = useState<Svid | 'all'>('all');
   const [starfsheitiFilter, setStarfsheitiFilter] = useState('all');
   const [markhopurFilter, setMarkhopurFilter] = useState('all');
+  const [ahugamalFilter, setAhugamalFilter] = useState('all');
 
   // Selection & actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -118,7 +120,8 @@ export default function VidskiptavinirPage() {
           f.nafn.toLowerCase().includes(q);
         const matchStarfsheiti = starfsheitiFilter === 'all' || updated.titill === starfsheitiFilter;
         const matchMarkhópur = markhopurFilter === 'all' || (updated.markhópar?.includes(markhopurFilter) ?? false);
-        if (matchSearch && matchStarfsheiti && matchMarkhópur) {
+        const matchAhugamal = ahugamalFilter === 'all' || (updated.ahugamal?.includes(ahugamalFilter) ?? false);
+        if (matchSearch && matchStarfsheiti && matchMarkhópur && matchAhugamal) {
           contacts.push({ tengiliður: updated, fyrirtaeki: f });
         }
       }
@@ -126,7 +129,19 @@ export default function VidskiptavinirPage() {
     return contacts.sort((a, b) =>
       a.tengiliður.nafn.localeCompare(b.tengiliður.nafn, 'is-IS'),
     );
-  }, [tengiliðirUpdates, search, tSvidFilter, starfsheitiFilter, markhopurFilter]);
+  }, [tengiliðirUpdates, search, tSvidFilter, starfsheitiFilter, markhopurFilter, ahugamalFilter]);
+
+  const uniqueAhugamal = useMemo(() => {
+    const set = new Set<string>();
+    for (const f of fyrirtaeki) {
+      for (const t of f.tengiliðir) {
+        const updated = tengiliðirUpdates[t.id] ?? t;
+        for (const a of (updated.ahugamal ?? [])) set.add(a);
+      }
+    }
+    for (const a of DEFAULT_AHUGAMAL) set.add(a);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'is-IS'));
+  }, [tengiliðirUpdates]);
 
   const uniqueStarfsheiti = useMemo(() => {
     const set = new Set<string>();
@@ -190,6 +205,7 @@ export default function VidskiptavinirPage() {
       'Aðaltengiliður': t.aðaltengiliður ? 'Já' : 'Nei',
       'Staða': t.staða ?? 'virkur',
       'Markhópar': (t.markhópar ?? []).map(id => allMarkhópar.find(m => m.id === id)?.nafn ?? id).join(', '),
+      'Áhugamál': (t.ahugamal ?? []).join(', '),
     }));
     const ws = utils.json_to_sheet(rows);
     const colWidths = Object.keys(rows[0] || {}).map(key => ({
@@ -318,10 +334,10 @@ export default function VidskiptavinirPage() {
                 <button
                   key={letter}
                   onClick={() => isActive && scrollToLetter(letter)}
-                  className={`w-7 h-7 rounded text-xs font-semibold transition-colors ${
+                  className={`w-7 h-7 rounded text-xs font-semibold transition-colors border ${
                     isActive
-                      ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 border border-blue-500/20'
-                      : 'text-white/25 hover:text-white/40 border border-transparent'
+                      ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 border-blue-500/20 cursor-pointer'
+                      : 'alphabet-inactive border-white/10 cursor-default'
                   }`}
                 >
                   {letter}
@@ -332,19 +348,19 @@ export default function VidskiptavinirPage() {
 
           {/* Company cards grouped by letter */}
           <div className="grid grid-cols-3 gap-3">
-            {IS_ALPHABET.map((letter) => {
-              const companies = grouped.get(letter);
+            {IS_ALPHABET.filter((letter) => grouped.has(letter)).map((letter) => {
+              const companies = grouped.get(letter)!;
               return (
                 <div key={letter} className="contents">
                   <div
                     id={`letter-${letter}`}
                     className="col-span-3 scroll-mt-4 flex items-center gap-2 pt-1 first:pt-0"
                   >
-                    <span className={`text-sm font-bold w-5 text-center ${companies ? 'text-blue-400' : 'text-white/15'}`}>{letter}</span>
+                    <span className="text-sm font-bold w-5 text-center text-blue-400">{letter}</span>
                     <div className="flex-1 h-px bg-white/5" />
-                    {companies && <span className="text-[10px] text-white/30">{companies.length}</span>}
+                    <span className="text-[10px] text-white/30">{companies.length}</span>
                   </div>
-                  {companies?.map((f) => (
+                  {companies.map((f) => (
                     <CompanyCard
                       key={f.id}
                       f={f}
@@ -401,9 +417,20 @@ export default function VidskiptavinirPage() {
               ))}
             </select>
 
-            {(tSvidFilter !== 'all' || starfsheitiFilter !== 'all' || markhopurFilter !== 'all') && (
+            <select
+              value={ahugamalFilter}
+              onChange={e => setAhugamalFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-[#161822] border border-white/5 text-xs text-white/80 focus:outline-none focus:ring-1 focus:ring-blue-500/50 [color-scheme:dark]"
+            >
+              <option value="all">Öll áhugamál</option>
+              {uniqueAhugamal.map(a => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+
+            {(tSvidFilter !== 'all' || starfsheitiFilter !== 'all' || markhopurFilter !== 'all' || ahugamalFilter !== 'all') && (
               <button
-                onClick={() => { setTSvidFilter('all'); setStarfsheitiFilter('all'); setMarkhopurFilter('all'); }}
+                onClick={() => { setTSvidFilter('all'); setStarfsheitiFilter('all'); setMarkhopurFilter('all'); setAhugamalFilter('all'); }}
                 className="text-xs text-white/30 hover:text-white/60 transition-colors flex items-center gap-1"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -531,6 +558,14 @@ export default function VidskiptavinirPage() {
                               </span>
                             );
                           })}
+                          {(t.ahugamal ?? []).map(a => (
+                            <span
+                              key={a}
+                              className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-teal-500/10 text-teal-400"
+                            >
+                              {a}
+                            </span>
+                          ))}
                         </div>
                       </div>
 

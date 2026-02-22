@@ -293,7 +293,7 @@ export const fyrirtaeki: Fyrirtaeki[] = [
           { id: 'ss7', tegund: 'símtal', titill: 'Spurðist fyrir um nýja bíla', lysing: 'Vildi vita hvort Kia EV6 sé á boðstólnum. Sagði já og lofaði tilboði.', dagsetning: '2026-02-21', hofundur: 'Sigurður Jónsson' },
         ],
       },
-      { id: 't5', nafn: 'Helga Rún', titill: 'Flutningsstjóri', simi: '555-2347', netfang: 'helga@marel.com', aðaltengiliður: false, staða: 'óvirkur', markhópar: ['mh3'], herferðir: [] },
+      { id: 't5', nafn: 'Helga Rún', titill: 'Flutningsstjóri', simi: '555-2347', netfang: 'helga@marel.com', aðaltengiliður: false, staða: 'óvirkur', markhópar: ['mh3'], herferðir: [], ahugamal: ['Útivist', 'Ferðalög'] },
     ],
     virktSamningar: 15,
     bilar: 22,
@@ -307,7 +307,7 @@ export const fyrirtaeki: Fyrirtaeki[] = [
     svid: 'flotaleiga',
     pipiTegund: 'floti',
     tengiliðir: [
-      { id: 't6', nafn: 'Björn Þór', titill: 'Tæknistjóri', simi: '555-3456', netfang: 'bjorn@lv.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh2', 'mh4'], herferðir: ['h1'] },
+      { id: 't6', nafn: 'Björn Þór', titill: 'Tæknistjóri', simi: '555-3456', netfang: 'bjorn@lv.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh2', 'mh4'], herferðir: ['h1'], ahugamal: ['Rafbílar', 'Tækni', 'Sjálfbærni', 'Golf'] },
     ],
     virktSamningar: 25,
     bilar: 40,
@@ -321,8 +321,8 @@ export const fyrirtaeki: Fyrirtaeki[] = [
     svid: 'langtimaleiga',
     pipiTegund: 'langtimaleiga',
     tengiliðir: [
-      { id: 't7', nafn: 'Kristín Sól', titill: 'Framkvæmdastjóri', simi: '555-4567', netfang: 'kristin@siminn.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh1'], herferðir: ['h2', 'h3'] },
-      { id: 't8', nafn: 'Ragnar Freyr', titill: 'Bílastjóri', simi: '555-4568', netfang: 'ragnar@siminn.is', aðaltengiliður: false, staða: 'virkur', markhópar: ['mh3'], herferðir: [] },
+      { id: 't7', nafn: 'Kristín Sól', titill: 'Framkvæmdastjóri', simi: '555-4567', netfang: 'kristin@siminn.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh1'], herferðir: ['h2', 'h3'], ahugamal: ['Ráðstefnur', 'Fjármál', 'Golf', 'Viðburðir'] },
+      { id: 't8', nafn: 'Ragnar Freyr', titill: 'Bílastjóri', simi: '555-4568', netfang: 'ragnar@siminn.is', aðaltengiliður: false, staða: 'virkur', markhópar: ['mh3'], herferðir: [], ahugamal: ['Bílar', 'Fótbolti', 'Handknattleikur'] },
     ],
     virktSamningar: 6,
     bilar: 8,
@@ -336,8 +336,8 @@ export const fyrirtaeki: Fyrirtaeki[] = [
     svid: 'flotaleiga',
     pipiTegund: 'sendibilar',
     tengiliðir: [
-      { id: 't9', nafn: 'Ólafur Karl', titill: 'Rekstrarstjóri', simi: '555-5678', netfang: 'olafur@eimskip.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh2', 'mh3'], herferðir: ['h1', 'h2'] },
-      { id: 't10', nafn: 'Sigríður Helga', titill: 'Innkaupastjóri', simi: '555-5679', netfang: 'sigridur@eimskip.is', aðaltengiliður: false, staða: 'lead', markhópar: ['mh4'], herferðir: ['h3'] },
+      { id: 't9', nafn: 'Ólafur Karl', titill: 'Rekstrarstjóri', simi: '555-5678', netfang: 'olafur@eimskip.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh2', 'mh3'], herferðir: ['h1', 'h2'], ahugamal: ['Golf', 'Ferðalög', 'Útivist'] },
+      { id: 't10', nafn: 'Sigríður Helga', titill: 'Innkaupastjóri', simi: '555-5679', netfang: 'sigridur@eimskip.is', aðaltengiliður: false, staða: 'lead', markhópar: ['mh4'], herferðir: ['h3'], ahugamal: ['Sjálfbærni', 'Heilsa og líðan', 'Hlaup'] },
     ],
     virktSamningar: 18,
     bilar: 30,
@@ -351,7 +351,7 @@ export const fyrirtaeki: Fyrirtaeki[] = [
     svid: 'langtimaleiga',
     pipiTegund: 'serpantanir',
     tengiliðir: [
-      { id: 't11', nafn: 'Margrét Dóra', titill: 'Mannauðsstjóri', simi: '555-6789', netfang: 'margret@origo.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh1', 'mh4'], herferðir: ['h1'] },
+      { id: 't11', nafn: 'Margrét Dóra', titill: 'Mannauðsstjóri', simi: '555-6789', netfang: 'margret@origo.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh1', 'mh4'], herferðir: ['h1'], ahugamal: ['Heilsa og líðan', 'Viðburðir', 'Listir og menning'] },
     ],
     virktSamningar: 4,
     bilar: 5,
@@ -365,8 +365,8 @@ export const fyrirtaeki: Fyrirtaeki[] = [
     svid: 'langtimaleiga',
     pipiTegund: 'langtimaleiga',
     tengiliðir: [
-      { id: 't12', nafn: 'Þórdís Björk', titill: 'Fjármálastjóri', simi: '555-7890', netfang: 'thordis@vis.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh1', 'mh2'], herferðir: ['h2'] },
-      { id: 't13', nafn: 'Guðmundur Arnar', titill: 'Sölumaður', simi: '555-7891', netfang: 'gudmundur@vis.is', aðaltengiliður: false, staða: 'fyrrverandi', markhópar: ['mh3'], herferðir: [] },
+      { id: 't12', nafn: 'Þórdís Björk', titill: 'Fjármálastjóri', simi: '555-7890', netfang: 'thordis@vis.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh1', 'mh2'], herferðir: ['h2'], ahugamal: ['Golf', 'Fjármál', 'Ráðstefnur', 'Ferðalög'] },
+      { id: 't13', nafn: 'Guðmundur Arnar', titill: 'Sölumaður', simi: '555-7891', netfang: 'gudmundur@vis.is', aðaltengiliður: false, staða: 'fyrrverandi', markhópar: ['mh3'], herferðir: [], ahugamal: ['Fótbolti', 'Bílar'] },
     ],
     virktSamningar: 10,
     bilar: 14,
@@ -380,7 +380,7 @@ export const fyrirtaeki: Fyrirtaeki[] = [
     svid: 'flotaleiga',
     pipiTegund: 'floti',
     tengiliðir: [
-      { id: 't14', nafn: 'Hrafn Sigurðsson', titill: 'Flutningsstjóri', simi: '555-8901', netfang: 'hrafn@re.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh2'], herferðir: ['h1', 'h3'] },
+      { id: 't14', nafn: 'Hrafn Sigurðsson', titill: 'Flutningsstjóri', simi: '555-8901', netfang: 'hrafn@re.is', aðaltengiliður: true, staða: 'virkur', markhópar: ['mh2'], herferðir: ['h1', 'h3'], ahugamal: ['Ferðalög', 'Golf', 'Útivist', 'Fjölskylda'] },
     ],
     virktSamningar: 12,
     bilar: 20,
@@ -546,7 +546,7 @@ export const thjonustuaminningar: Thjonustuaminning[] = [
 
 export const verkefni: Verkefni[] = [
   {
-    id: 'v1', titill: 'Samningur rennur út - Ístak HI-302', lýsing: 'Langtímasamningur s1 rennur út 31. mars. Senda tölvupóst á viðskiptavin.', samningurId: 's1', fyrirtaekiId: 'f1', billId: 'b5', status: 'í gangi', forgangur: 'hátt', dagsetning: '2026-02-15', deadline: '2026-02-21', sjálfvirkt: true, abyrgdaradili: 'Anna', stofnadAf: 'Kerfið', deild: 'langtímaleiga',
+    id: 'v1', titill: 'Samningur rennur út - Ístak HI-302', lýsing: 'Langtímasamningur s1 rennur út 31. mars. Senda tölvupóst á viðskiptavin.', samningurId: 's1', fyrirtaekiId: 'f1', billId: 'b5', status: 'í gangi', forgangur: 'hátt', dagsetning: '2026-02-15', deadline: '2026-02-21', sjálfvirkt: false, abyrgdaradili: 'Anna', stofnadAf: 'Kerfið', deild: 'langtímaleiga',
     checklist: [
       { id: 'cl1', texti: 'Senda tölvupóst á Guðrúnu', lokid: true, lokadAf: 'Anna' },
       { id: 'cl2', texti: 'Fá staðfestingu á endurnýjun', lokid: false },
@@ -564,7 +564,7 @@ export const verkefni: Verkefni[] = [
     athugasemdir: [],
   },
   {
-    id: 'v3', titill: 'Samningur rennur út - VÍS OC-301', lýsing: 'Langtímasamningur s10 rennur út 28. feb. Senda tölvupóst á Þórdísi.', samningurId: 's10', fyrirtaekiId: 'f7', billId: 'b4', status: 'opið', forgangur: 'brýnt', dagsetning: '2026-02-10', deadline: '2026-02-21', sjálfvirkt: true, abyrgdaradili: 'Anna', stofnadAf: 'Kerfið', deild: 'langtímaleiga',
+    id: 'v3', titill: 'Samningur rennur út - VÍS OC-301', lýsing: 'Langtímasamningur s10 rennur út 28. feb. Senda tölvupóst á Þórdísi.', samningurId: 's10', fyrirtaekiId: 'f7', billId: 'b4', status: 'opið', forgangur: 'brýnt', dagsetning: '2026-02-10', deadline: '2026-02-21', sjálfvirkt: false, abyrgdaradili: 'Anna', stofnadAf: 'Kerfið', deild: 'langtímaleiga',
     checklist: [
       { id: 'cl7', texti: 'Senda tölvupóst á Þórdísi', lokid: false },
       { id: 'cl8', texti: 'Bóka skilamat', lokid: false },
@@ -665,6 +665,27 @@ export const tryggingarPakkar = [
   { nafn: 'Enterprise', sjalfsabyrgd: 250000, framruda: false, folksbilVerð: 0, jeppaVerð: 0, lysing: 'Innifalin' },
   { nafn: 'Plús', sjalfsabyrgd: 150000, framruda: true, framrudaSjalfsabyrgd: '50%', folksbilVerð: 4900, jeppaVerð: 6900, lysing: 'Lækkuð sjálfsábyrgð' },
   { nafn: 'Úrvals', sjalfsabyrgd: 75000, framruda: true, framrudaSjalfsabyrgd: '15%', folksbilVerð: 8900, jeppaVerð: 10900, lysing: 'Lægsta sjálfsábyrgð' },
+];
+
+// ============ SJÁLFGEFIN ÁHUGAMÁL / ATHYGLISVERT ============
+
+export const DEFAULT_AHUGAMAL: string[] = [
+  'Golf',
+  'Hlaup',
+  'Fótbolti',
+  'Handknattleikur',
+  'Útivist',
+  'Ferðalög',
+  'Sjálfbærni',
+  'Rafbílar',
+  'Bílar',
+  'Tækni',
+  'Fjármál',
+  'Ráðstefnur',
+  'Viðburðir',
+  'Fjölskylda',
+  'Heilsa og líðan',
+  'Listir og menning',
 ];
 
 // ============ MARKHÓPAR, HERFERÐIR OG EMAIL TEMPLATES ============

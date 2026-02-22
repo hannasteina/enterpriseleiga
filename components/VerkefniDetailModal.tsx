@@ -29,7 +29,7 @@ const deildLabels: Record<string, string> = {
 };
 
 const statusOptions: { value: Verkefni['status']; label: string }[] = [
-  { value: 'opið', label: 'Opið' },
+  { value: 'opið', label: 'Stofnuð' },
   { value: 'í gangi', label: 'Í gangi' },
   { value: 'lokið', label: 'Lokið' },
 ];

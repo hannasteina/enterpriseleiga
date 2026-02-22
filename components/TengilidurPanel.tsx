@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   getVirkirNotendur,
+  DEFAULT_AHUGAMAL,
   type Tengiliður,
   type TengiliðurAthugasemd,
   type TengiliðurSamskipti,
@@ -342,6 +343,20 @@ export default function TengilidurPanel({ tengiliður, onClose, onSave, onCreate
                     +
                   </button>
                 </div>
+                {DEFAULT_AHUGAMAL.filter(a => !ahugamal.includes(a)).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {DEFAULT_AHUGAMAL.filter(a => !ahugamal.includes(a)).map(a => (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => setAhugamal(prev => [...prev, a])}
+                        className="text-[11px] px-2 py-0.5 rounded-full border border-white/10 text-white/40 hover:border-teal-500/30 hover:text-teal-400 hover:bg-teal-500/10 transition-colors"
+                      >
+                        + {a}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Save button */}

@@ -267,6 +267,17 @@ body {
   background-color: rgba(37, 99, 235, 0.12) !important;
 }
 
+/* --- Alphabet inactive buttons --- */
+.alphabet-inactive {
+  color: rgba(255, 255, 255, 0.35);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+[data-enterprise-theme="light"] .alphabet-inactive {
+  color: rgba(26, 31, 28, 0.35) !important;
+  background-color: rgba(40, 56, 40, 0.06) !important;
+  border-color: rgba(40, 56, 40, 0.12) !important;
+}
+
 /* --- Stat card & hero gradient overrides for light mode --- */
 [data-enterprise-theme="light"] .enterprise-hero-gradient {
   background: linear-gradient(135deg, #e8ecf4 0%, #ede8f5 50%, #e8ecf4 100%) !important;

@@ -242,6 +242,8 @@ function ColumnFilterDropdown({
   const ref = useRef<HTMLTableHeaderCellElement>(null);
   const isOpen = openFilter === columnId;
   const hasFilter = selected.size > 0;
+  const allSelected = selected.size === 0;
+  const noneSelected = selected.size > 0 && options.every((o) => !selected.has(o.value));
 
   useEffect(() => {
     if (!isOpen) return;
@@ -254,18 +256,58 @@ function ColumnFilterDropdown({
     return () => document.removeEventListener('mousedown', handle);
   }, [isOpen, setOpenFilter]);
 
+  function handleSelectAll() {
+    onChange(new Set());
+  }
+
+  function handleDeselectAll() {
+    onChange(new Set(['__none__']));
+  }
+
+  function handleToggle(value: string) {
+    if (allSelected) {
+      const next = new Set(options.map((o) => o.value));
+      next.delete(value);
+      if (next.size === 0) {
+        onChange(new Set(['__none__']));
+      } else {
+        onChange(next);
+      }
+    } else {
+      const next = new Set(selected);
+      next.delete('__none__');
+      if (next.has(value)) {
+        next.delete(value);
+        if (next.size === 0) {
+          onChange(new Set(['__none__']));
+        } else {
+          onChange(next);
+        }
+      } else {
+        next.add(value);
+        if (next.size === options.length) {
+          onChange(new Set());
+        } else {
+          onChange(next);
+        }
+      }
+    }
+  }
+
+  const checkedCount = allSelected ? options.length : options.filter((o) => selected.has(o.value)).length;
+
   return (
     <th className="px-5 py-3 text-left relative" ref={ref}>
       <button
         onClick={() => setOpenFilter(isOpen ? null : columnId)}
         className={`flex items-center gap-1 text-xs font-medium transition-colors whitespace-nowrap ${
-          hasFilter ? 'text-blue-400' : 'text-white/40 hover:text-white/60'
+          hasFilter && !allSelected ? 'text-blue-400' : 'text-white/40 hover:text-white/60'
         }`}
       >
         {label}
-        {hasFilter && (
+        {hasFilter && !allSelected && (
           <span className="bg-blue-500/20 text-blue-400 text-[10px] px-1 rounded-full min-w-[16px] text-center leading-4">
-            {selected.size}
+            {checkedCount}
           </span>
         )}
         <svg className={`w-3 h-3 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -274,36 +316,36 @@ function ColumnFilterDropdown({
       </button>
       {isOpen && (
         <div className="absolute left-0 top-full mt-1 z-40 bg-[#1a1d2e] border border-white/10 rounded-lg shadow-xl min-w-[200px] py-1">
-          {hasFilter && (
+          <div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/5 mb-0.5">
             <button
-              onClick={() => onChange(new Set())}
-              className="w-full px-3 py-1.5 text-left text-[11px] text-blue-400 hover:bg-white/5 transition-colors border-b border-white/5 mb-0.5"
+              onClick={handleSelectAll}
+              className={`flex-1 px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                allSelected
+                  ? 'bg-blue-500/15 text-blue-400'
+                  : 'text-white/40 hover:text-white/60 hover:bg-white/5'
+              }`}
             >
-              Hreinsa val
+              Velja allt
             </button>
-          )}
+            <button
+              onClick={handleDeselectAll}
+              className={`flex-1 px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                noneSelected
+                  ? 'bg-blue-500/15 text-blue-400'
+                  : 'text-white/40 hover:text-white/60 hover:bg-white/5'
+              }`}
+            >
+              Afvelja allt
+            </button>
+          </div>
           <div className="max-h-[250px] overflow-y-auto">
             {options.map((opt) => {
-              const checked = selected.size === 0 || selected.has(opt.value);
+              const checked = allSelected || selected.has(opt.value);
               return (
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => {
-                    const next = new Set(selected);
-                    if (selected.size === 0) {
-                      options.forEach((o) => { if (o.value !== opt.value) next.add(o.value); });
-                    } else if (next.has(opt.value)) {
-                      next.delete(opt.value);
-                    } else {
-                      next.add(opt.value);
-                    }
-                    if (next.size === 0 || next.size === options.length) {
-                      onChange(new Set());
-                    } else {
-                      onChange(next);
-                    }
-                  }}
+                  onClick={() => handleToggle(opt.value)}
                   className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-white/5 cursor-pointer transition-colors"
                 >
                   <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${

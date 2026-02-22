@@ -290,7 +290,7 @@ export default function FinnaTaekifaeriPanel({ onClose, onStofnaTaekifaeri }: Pr
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              Bílaflottaskrá
+              Bílaflotaskrá
               {!bfLoading && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400">{bfData.length.toLocaleString('is-IS')}</span>}
             </button>
             <button
