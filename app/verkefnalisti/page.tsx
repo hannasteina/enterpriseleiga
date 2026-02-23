@@ -28,6 +28,7 @@ import {
 import { useVerkefniStore } from '@/lib/verkefni-store';
 import VerkefniDetailModal from '@/components/VerkefniDetailModal';
 import NyttVerkefniModal from '@/components/NyttVerkefniModal';
+import { useEnterpriseTheme } from '@/components/enterprise-theme-provider';
 
 type TabFilter = 'min' | 'deild' | 'lokin';
 type DeildFilter = 'allt' | 'langtímaleiga' | 'flotaleiga' | 'þjónusta' | 'sala';
@@ -111,6 +112,8 @@ function KanbanColumn({
   children: React.ReactNode;
   count: number;
 }) {
+  const { theme } = useEnterpriseTheme();
+  const isLight = theme === 'light';
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status}` });
   const statusColor = getStatusColor(status);
 
@@ -123,8 +126,8 @@ function KanbanColumn({
     >
       <div className="flex items-center gap-3 px-4 py-3 mb-3">
         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: statusColor }} />
-        <h3 className="text-sm font-semibold text-white">{statusLabels[status]}</h3>
-        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/5 text-white/40">
+        <h3 className={`text-sm font-semibold ${isLight ? 'text-gray-800' : 'text-white'}`}>{statusLabels[status]}</h3>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${isLight ? 'bg-gray-100 text-gray-500' : 'bg-white/5 text-white/40'}`}>
           {count}
         </span>
       </div>
@@ -262,6 +265,8 @@ function AssigneeDropdown({
 
 // ─── Rich Task Card (shared between Kanban & Card overlay) ──────
 function VerkefniCard({ v, onClick, onAssign }: { v: Verkefni; onClick: () => void; onAssign?: (nafn: string) => void }) {
+  const { theme } = useEnterpriseTheme();
+  const isLight = theme === 'light';
   const fyrirtaeki = v.fyrirtaekiId ? getFyrirtaeki(v.fyrirtaekiId) : null;
   const bill = v.billId ? getBill(v.billId) : null;
   const progress = getChecklistProgress(v);
@@ -275,7 +280,11 @@ function VerkefniCard({ v, onClick, onAssign }: { v: Verkefni; onClick: () => vo
         e.stopPropagation();
         onClick();
       }}
-      className="bg-[#161822] rounded-xl border border-white/[0.06] hover:border-white/[0.15] transition-all cursor-pointer group hover:shadow-lg hover:shadow-black/20 relative overflow-hidden"
+      className={`rounded-xl border transition-all cursor-pointer group relative overflow-hidden ${
+        isLight
+          ? 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-md'
+          : 'bg-[#161822] border-white/[0.06] hover:border-white/[0.15] hover:shadow-lg hover:shadow-black/20'
+      }`}
     >
       {/* Left color stripe */}
       <div
@@ -317,18 +326,18 @@ function VerkefniCard({ v, onClick, onAssign }: { v: Verkefni; onClick: () => vo
         </div>
 
         {/* Title */}
-        <h4 className="text-[13px] font-semibold text-white mb-1.5 group-hover:text-blue-300 transition-colors leading-snug">
+        <h4 className={`text-[13px] font-semibold mb-1.5 transition-colors leading-snug ${isLight ? 'text-gray-800 group-hover:text-blue-600' : 'text-white group-hover:text-blue-300'}`}>
           {v.titill}
         </h4>
 
         {/* Description */}
-        <p className="text-xs text-white/45 line-clamp-2 mb-3 leading-relaxed">{v.lýsing}</p>
+        <p className={`text-xs line-clamp-2 mb-3 leading-relaxed ${isLight ? 'text-gray-500' : 'text-white/45'}`}>{v.lýsing}</p>
 
         {/* Related info tags */}
         {(fyrirtaeki || bill) && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {fyrirtaeki && (
-              <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/[0.04] text-white/50 flex items-center gap-1">
+              <span className={`text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 ${isLight ? 'bg-gray-100 text-gray-500' : 'bg-white/[0.04] text-white/50'}`}>
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 0h.008v.008h-.008V7.5zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
                 </svg>
@@ -336,7 +345,7 @@ function VerkefniCard({ v, onClick, onAssign }: { v: Verkefni; onClick: () => vo
               </span>
             )}
             {bill && (
-              <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/[0.04] text-white/50 flex items-center gap-1">
+              <span className={`text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 ${isLight ? 'bg-gray-100 text-gray-500' : 'bg-white/[0.04] text-white/50'}`}>
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.079-.481 1.04-1.099l-.52-8.742A1.125 1.125 0 0019.128 7.5H4.872a1.125 1.125 0 00-1.12 1.009l-.52 8.742c-.04.618.418 1.099 1.04 1.099H6" />
                 </svg>
@@ -350,7 +359,7 @@ function VerkefniCard({ v, onClick, onAssign }: { v: Verkefni; onClick: () => vo
         {progress && (
           <div className="mb-3">
             <div className="flex items-center gap-2 mb-1">
-              <div className="flex-1 bg-white/[0.06] rounded-full h-1.5">
+              <div className={`flex-1 rounded-full h-1.5 ${isLight ? 'bg-gray-100' : 'bg-white/[0.06]'}`}>
                 <div
                   className="h-1.5 rounded-full transition-all duration-500"
                   style={{
@@ -360,13 +369,13 @@ function VerkefniCard({ v, onClick, onAssign }: { v: Verkefni; onClick: () => vo
                   }}
                 />
               </div>
-              <span className="text-[10px] text-white/30 tabular-nums">{progress.done}/{progress.total}</span>
+              <span className={`text-[10px] tabular-nums ${isLight ? 'text-gray-400' : 'text-white/30'}`}>{progress.done}/{progress.total}</span>
             </div>
           </div>
         )}
 
         {/* Footer: avatar, deadline, comment count */}
-        <div className="flex items-center justify-between pt-2.5 border-t border-white/[0.05]">
+        <div className={`flex items-center justify-between pt-2.5 border-t ${isLight ? 'border-gray-100' : 'border-white/[0.05]'}`}>
           {/* Assignee avatar with dropdown */}
           {onAssign ? (
             <AssigneeDropdown currentName={v.abyrgdaradili} onAssign={onAssign} />
@@ -378,14 +387,14 @@ function VerkefniCard({ v, onClick, onAssign }: { v: Verkefni; onClick: () => vo
               >
                 {v.abyrgdaradili[0]}
               </div>
-              <span className="text-[11px] text-white/50">{v.abyrgdaradili}</span>
+              <span className={`text-[11px] ${isLight ? 'text-gray-500' : 'text-white/50'}`}>{v.abyrgdaradili}</span>
             </div>
           )}
 
           <div className="flex items-center gap-3">
             {/* Comment count */}
             {commentCount > 0 && (
-              <span className="flex items-center gap-1 text-[10px] text-white/30">
+              <span className={`flex items-center gap-1 text-[10px] ${isLight ? 'text-gray-400' : 'text-white/30'}`}>
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
                 </svg>
@@ -525,6 +534,8 @@ function ListRow({ v, onClick }: { v: Verkefni; onClick: () => void }) {
 
 // ─── Main Page ───────────────────────────────────────────────────
 export default function VerkefnalistiPage() {
+  const { theme } = useEnterpriseTheme();
+  const isLight = theme === 'light';
   const [activeTab, setActiveTab] = useState<TabFilter>('min');
   const [deildFilter, setDeildFilter] = useState<DeildFilter>('allt');
   const [selectedVerkefniId, setSelectedVerkefniId] = useState<string | null>(null);
@@ -656,8 +667,8 @@ export default function VerkefnalistiPage() {
       {/* ── Header ─────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Verkefni</h1>
-          <p className="text-sm text-white/40 mt-0.5">Stjórnaðu verkefnum á einum stað</p>
+          <h1 className={`text-2xl font-bold ${isLight ? 'text-gray-900' : 'text-white'}`}>Verkefni</h1>
+          <p className={`text-sm mt-0.5 ${isLight ? 'text-gray-500' : 'text-white/40'}`}>Stjórnaðu verkefnum á einum stað</p>
         </div>
         <button
           onClick={() => setShowNewForm(true)}
@@ -673,10 +684,10 @@ export default function VerkefnalistiPage() {
       {/* ── Stats Bar ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         {/* Overall progress */}
-        <div className="col-span-2 bg-[#161822] rounded-2xl border border-white/5 p-4 flex items-center gap-4">
+        <div className={`col-span-2 rounded-2xl border p-4 flex items-center gap-4 ${isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-[#161822] border-white/5'}`}>
           <div className="relative w-14 h-14 shrink-0">
             <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
-              <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+              <circle cx="28" cy="28" r="24" fill="none" stroke={isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'} strokeWidth="5" />
               <circle
                 cx="28" cy="28" r="24" fill="none"
                 stroke="#22c55e"
@@ -685,32 +696,32 @@ export default function VerkefnalistiPage() {
                 strokeDasharray={`${(stats.completionPct / 100) * 150.8} 150.8`}
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
+            <span className={`absolute inset-0 flex items-center justify-center text-xs font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>
               {stats.completionPct}%
             </span>
           </div>
           <div>
-            <div className="text-sm font-semibold text-white">Framvinda</div>
-            <div className="text-xs text-white/40">{stats.lokid} af {stats.total} verkefnum lokið</div>
+            <div className={`text-sm font-semibold ${isLight ? 'text-gray-900' : 'text-white'}`}>Framvinda</div>
+            <div className={`text-xs ${isLight ? 'text-gray-500' : 'text-white/40'}`}>{stats.lokid} af {stats.total} verkefnum lokið</div>
           </div>
         </div>
 
-        <StatCard label="Stofnuð" value={stats.stofnud} color="#3b82f6" icon={
+        <StatCard label="Stofnuð" value={stats.stofnud} color="#3b82f6" isLight={isLight} icon={
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         } />
-        <StatCard label="Í gangi" value={stats.iGangi} color="#8b5cf6" icon={
+        <StatCard label="Í gangi" value={stats.iGangi} color="#8b5cf6" isLight={isLight} icon={
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
           </svg>
         } />
-        <StatCard label="Lokið" value={stats.lokid} color="#22c55e" icon={
+        <StatCard label="Lokið" value={stats.lokid} color="#22c55e" isLight={isLight} icon={
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         } />
-        <StatCard label="Útrunnið" value={stats.overdue} color={stats.overdue > 0 ? '#ef4444' : '#6b7280'} icon={
+        <StatCard label="Útrunnið" value={stats.overdue} color={stats.overdue > 0 ? '#ef4444' : '#6b7280'} isLight={isLight} icon={
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
           </svg>
@@ -721,7 +732,7 @@ export default function VerkefnalistiPage() {
       <div className="flex flex-wrap gap-3 items-center">
         {/* Search */}
         <div className="relative">
-          <svg className="w-4 h-4 text-white/30 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-gray-400' : 'text-white/30'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
           <input
@@ -729,12 +740,16 @@ export default function VerkefnalistiPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Leita í verkefnum..."
-            className="bg-[#161822] border border-white/[0.06] rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-[220px]"
+            className={`border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-[220px] ${
+              isLight
+                ? 'bg-white border-gray-200 text-gray-900 placeholder:text-gray-400'
+                : 'bg-[#161822] border-white/[0.06] text-white placeholder:text-white/25'
+            }`}
           />
         </div>
 
         {/* Tab filter */}
-        <div className="flex rounded-xl border border-white/[0.06] overflow-hidden bg-[#161822]">
+        <div className={`flex rounded-xl border overflow-hidden ${isLight ? 'border-gray-200 bg-white' : 'border-white/[0.06] bg-[#161822]'}`}>
           {([
             { key: 'min' as const, label: 'Mín verkefni' },
             { key: 'deild' as const, label: 'Deildarverkefni' },
@@ -745,8 +760,8 @@ export default function VerkefnalistiPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`px-4 py-2 text-sm font-medium transition-all ${
                 activeTab === tab.key
-                  ? 'bg-blue-600/20 text-blue-400'
-                  : 'text-white/50 hover:text-white hover:bg-white/[0.03]'
+                  ? isLight ? 'bg-blue-50 text-blue-600' : 'bg-blue-600/20 text-blue-400'
+                  : isLight ? 'text-gray-500 hover:text-gray-700 hover:bg-gray-50' : 'text-white/50 hover:text-white hover:bg-white/[0.03]'
               }`}
             >
               {tab.label}
@@ -758,22 +773,28 @@ export default function VerkefnalistiPage() {
         <select
           value={deildFilter}
           onChange={(e) => setDeildFilter(e.target.value as DeildFilter)}
-          className="bg-[#161822] border border-white/[0.06] rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-          style={{ colorScheme: 'dark' }}
+          className={`border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
+            isLight
+              ? 'bg-white border-gray-200 text-gray-700'
+              : 'bg-[#161822] border-white/[0.06] text-white'
+          }`}
+          style={{ colorScheme: isLight ? 'light' : 'dark' }}
         >
-          <option value="allt" style={{ background: '#1a1d2e', color: '#ffffff' }}>Allar deildir</option>
-          <option value="langtímaleiga" style={{ background: '#1a1d2e', color: '#ffffff' }}>Langtímaleiga</option>
-          <option value="flotaleiga" style={{ background: '#1a1d2e', color: '#ffffff' }}>Flotaleiga</option>
-          <option value="þjónusta" style={{ background: '#1a1d2e', color: '#ffffff' }}>Þjónusta</option>
-          <option value="sala" style={{ background: '#1a1d2e', color: '#ffffff' }}>Sala</option>
+          <option value="allt">Allar deildir</option>
+          <option value="langtímaleiga">Langtímaleiga</option>
+          <option value="flotaleiga">Flotaleiga</option>
+          <option value="þjónusta">Þjónusta</option>
+          <option value="sala">Sala</option>
         </select>
 
         {/* View mode toggle */}
-        <div className="flex rounded-xl border border-white/[0.06] overflow-hidden bg-[#161822] ml-auto">
+        <div className={`flex rounded-xl border overflow-hidden ml-auto ${isLight ? 'border-gray-200 bg-white' : 'border-white/[0.06] bg-[#161822]'}`}>
           <button
             onClick={() => setViewMode('kanban')}
             className={`p-2 transition-all ${
-              viewMode === 'kanban' ? 'bg-blue-600/20 text-blue-400' : 'text-white/40 hover:text-white hover:bg-white/[0.03]'
+              viewMode === 'kanban'
+                ? isLight ? 'bg-blue-50 text-blue-600' : 'bg-blue-600/20 text-blue-400'
+                : isLight ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-50' : 'text-white/40 hover:text-white hover:bg-white/[0.03]'
             }`}
             title="Kanban"
           >
@@ -784,7 +805,9 @@ export default function VerkefnalistiPage() {
           <button
             onClick={() => setViewMode('list')}
             className={`p-2 transition-all ${
-              viewMode === 'list' ? 'bg-blue-600/20 text-blue-400' : 'text-white/40 hover:text-white hover:bg-white/[0.03]'
+              viewMode === 'list'
+                ? isLight ? 'bg-blue-50 text-blue-600' : 'bg-blue-600/20 text-blue-400'
+                : isLight ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-50' : 'text-white/40 hover:text-white hover:bg-white/[0.03]'
             }`}
             title="Listi"
           >
@@ -812,12 +835,12 @@ export default function VerkefnalistiPage() {
 
       {/* ── Content ────────────────────────────────────────── */}
       {filteredVerkefni.length === 0 ? (
-        <div className="bg-[#161822] rounded-2xl border border-white/5 p-16 text-center">
-          <svg className="w-12 h-12 text-white/10 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+        <div className={`rounded-2xl border p-16 text-center ${isLight ? 'bg-white border-gray-200' : 'bg-[#161822] border-white/5'}`}>
+          <svg className={`w-12 h-12 mx-auto mb-4 ${isLight ? 'text-gray-200' : 'text-white/10'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
           </svg>
-          <p className="text-sm text-white/30 mb-1">Engin verkefni fundust</p>
-          <p className="text-xs text-white/20">Prófaðu að breyta síum eða búa til nýtt verkefni</p>
+          <p className={`text-sm mb-1 ${isLight ? 'text-gray-400' : 'text-white/30'}`}>Engin verkefni fundust</p>
+          <p className={`text-xs ${isLight ? 'text-gray-300' : 'text-white/20'}`}>Prófaðu að breyta síum eða búa til nýtt verkefni</p>
         </div>
       ) : viewMode === 'kanban' ? (
         /* ── Kanban Board ──────────────────────────────── */
@@ -925,15 +948,17 @@ function StatCard({
   color,
   icon,
   pulse,
+  isLight,
 }: {
   label: string;
   value: number;
   color: string;
   icon: React.ReactNode;
   pulse?: boolean;
+  isLight?: boolean;
 }) {
   return (
-    <div className="bg-[#161822] rounded-2xl border border-white/5 p-4 flex items-center gap-3">
+    <div className={`rounded-2xl border p-4 flex items-center gap-3 ${isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-[#161822] border-white/5'}`}>
       <div
         className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${pulse ? 'animate-pulse' : ''}`}
         style={{ backgroundColor: `${color}15`, color }}
@@ -942,7 +967,7 @@ function StatCard({
       </div>
       <div>
         <div className="text-lg font-bold" style={{ color }}>{value}</div>
-        <div className="text-[10px] font-medium text-white/35 uppercase tracking-wider">{label}</div>
+        <div className={`text-[10px] font-medium uppercase tracking-wider ${isLight ? 'text-gray-500' : 'text-white/35'}`}>{label}</div>
       </div>
     </div>
   );

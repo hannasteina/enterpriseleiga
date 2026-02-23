@@ -163,8 +163,20 @@ export default function EnterpriseDemoDashboard() {
     verkefni.filter(v => v.status !== 'lokið').sort((a, b) => a.deadline.localeCompare(b.deadline)),
   []);
 
-  const verkefniIGangi = useMemo(() => allVerkefniActive.filter(v => v.status === 'í gangi'), [allVerkefniActive]);
-  const verkefniStofnud = useMemo(() => allVerkefniActive.filter(v => v.status === 'opið'), [allVerkefniActive]);
+  // "Mín verkefni" - sía eftir innskráðum notanda.
+  // Í gangi: verkefni sem ÉG á (abyrgdaradili).
+  // Stofnuð: verkefni sem ÉG stofnaði (stofnadAf).
+  // TODO (alvöru gögn): Nota user_id úr Supabase auth í stað nafnasamanburðar.
+  //   Bæta við user_id foreign key á verkefni töfluna og sía með .eq('abyrgdaradili_id', user.id).
+  const currentUser = userName || 'Kristján';
+  const verkefniIGangi = useMemo(() =>
+    allVerkefniActive.filter(v => v.status === 'í gangi' && v.abyrgdaradili === currentUser),
+    [allVerkefniActive, currentUser]
+  );
+  const verkefniStofnud = useMemo(() =>
+    allVerkefniActive.filter(v => v.status === 'opið' && v.stofnadAf === currentUser),
+    [allVerkefniActive, currentUser]
+  );
   const minVerkefniActive = minVerkefniTab === 'uthlutad' ? verkefniIGangi : verkefniStofnud;
 
   const iLeigu = filteredBilar.filter(b => b.status === 'í leigu').length;
@@ -176,8 +188,6 @@ export default function EnterpriseDemoDashboard() {
   const selectedVerkefni = selectedVerkefniId
     ? verkefniStore.getVerkefniById(selectedVerkefniId) ?? null
     : null;
-
-  const currentUser = userName || 'Kristján';
 
   const handleSendNotification = useCallback(async (verkefniId: string, tilNotandaId: string, skilabod: string) => {
     const v = verkefniStore.getVerkefniById(verkefniId);
@@ -522,7 +532,7 @@ export default function EnterpriseDemoDashboard() {
   };
 
   const widgetMeta: Record<WidgetId, { badge?: number; badgeColor?: string; accentColor: string; link?: string; linkLabel?: string; totalItems?: number }> = {
-    minVerkefni: { badge: allVerkefniActive.length, badgeColor: '#8b5cf6', accentColor: '#8b5cf6', link: '/verkefnalisti', linkLabel: 'Sjá öll →', totalItems: minVerkefniActive.length },
+    minVerkefni: { badge: verkefniIGangi.length + verkefniStofnud.length, badgeColor: '#8b5cf6', accentColor: '#8b5cf6', link: '/verkefnalisti', linkLabel: 'Sjá öll →', totalItems: minVerkefniActive.length },
     verkefniDagsins: { badge: verkefniDagsins.length, badgeColor: '#3b82f6', accentColor: '#3b82f6', link: '/verkefnalisti', linkLabel: 'Sjá öll →', totalItems: verkefniDagsins.length },
     verkefniFramundan: { badge: verkefniFramundan.length, badgeColor: '#f59e0b', accentColor: '#f59e0b', link: '/verkefnalisti', linkLabel: 'Sjá öll →', totalItems: verkefniFramundan.length },
     samningarRennaUt: { badge: rennaUt.length, badgeColor: '#ef4444', accentColor: '#ef4444', link: '/samningar', linkLabel: 'Sjá alla →', totalItems: rennaUt.length },

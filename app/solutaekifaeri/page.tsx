@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import Link from 'next/link';
 import {
   solutaekifaeri as solutaekifaeriData,
-  mal,
   getFyrirtaeki,
   formatCurrency,
   getStatusColor,
@@ -31,6 +29,44 @@ const PIPELINE_COLUMNS: { stig: Solutaekifaeri['stig']; label: string; accent: s
   { stig: 'lokað unnið', label: 'Lokað unnið', accent: '#22c55e', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
   { stig: 'lokað tapað', label: 'Lokað tapað', accent: '#ef4444', icon: 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z' },
 ];
+
+interface SalesTeamMember {
+  id: string;
+  nafn: string;
+  titill: string;
+  litur: string;
+  initials: string;
+}
+
+const SALES_TEAM: SalesTeamMember[] = [
+  { id: 'st1', nafn: 'Anna Sigríður', titill: 'Sölustjóri', litur: '#8b5cf6', initials: 'AS' },
+  { id: 'st2', nafn: 'Kristján Már', titill: 'Söluráðgjafi', litur: '#3b82f6', initials: 'KM' },
+  { id: 'st3', nafn: 'Sigurður Helgi', titill: 'Söluráðgjafi', litur: '#22c55e', initials: 'SH' },
+  { id: 'st4', nafn: 'Helgi Björn', titill: 'Þjónustustjóri', litur: '#f59e0b', initials: 'HB' },
+];
+
+const OPPORTUNITY_OWNERS: Record<string, string> = {
+  'so1': 'st2',
+  'so2': 'st3',
+  'so3': 'st1',
+  'so4': 'st4',
+  'so5': 'st1',
+};
+
+function getOwner(stId: string): SalesTeamMember | undefined {
+  const ownerId = OPPORTUNITY_OWNERS[stId];
+  return SALES_TEAM.find(m => m.id === ownerId);
+}
+
+function getDaysInStage(dagsetning: string): number {
+  const created = new Date(dagsetning);
+  const now = new Date();
+  return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function isOverdue(naestiKontaktur: string): boolean {
+  return new Date(naestiKontaktur) < new Date();
+}
 
 type Hitastig = 'heitt' | 'volgt' | 'kalt';
 
@@ -79,12 +115,16 @@ function formatDate(iso: string): string {
 }
 
 export default function SolutaekifaeriPage() {
+  const { theme } = useEnterpriseTheme();
+  const isLight = theme === 'light';
   const [soList, setSoList] = useState<Solutaekifaeri[]>(solutaekifaeriData);
   const [selectedST, setSelectedST] = useState<Solutaekifaeri | null>(null);
   const [activePanel, setActivePanel] = useState<'detail' | 'email' | 'sima' | null>(null);
   const [showFinnaTaekifaeri, setShowFinnaTaekifaeri] = useState(false);
   const [showStofnaModal, setShowStofnaModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  type ActiveFilter = 'none' | 'opin' | 'unnid' | 'overdue' | 'eldest';
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('none');
   const [markhópar, setMarkhópar] = useState<MarkhópurDef[]>(DEFAULT_MARKHÓPAR);
   const [leadTags, setLeadTags] = useState<LeadTagState>(() => {
     const initial: LeadTagState = {};
@@ -101,7 +141,16 @@ export default function SolutaekifaeriPage() {
 
   const opinSolutaekifaeri = soList.filter(s => s.stig !== 'lokað tapað' && s.stig !== 'lokað unnið');
   const pipalineVerdmaeti = opinSolutaekifaeri.reduce((sum, s) => sum + s.verdmaeti, 0);
-  const opinMal = mal.filter(m => m.status !== 'lokað');
+
+  const filteredSoList = (() => {
+    switch (activeFilter) {
+      case 'opin': return opinSolutaekifaeri;
+      case 'unnid': return soList.filter(s => s.stig === 'lokað unnið');
+      case 'overdue': return opinSolutaekifaeri.filter(s => isOverdue(s.naestiKontaktur));
+      case 'eldest': return [...opinSolutaekifaeri].sort((a, b) => getDaysInStage(b.dagsetning) - getDaysInStage(a.dagsetning));
+      default: return soList;
+    }
+  })();
 
   const toggleMarkhópur = (stId: string, mk: string) => {
     setLeadTags(prev => {
@@ -198,7 +247,7 @@ export default function SolutaekifaeriPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Hero Header */}
-      <div className="enterprise-hero-gradient relative overflow-hidden rounded-2xl border border-white/5" style={{ background: 'linear-gradient(135deg, #0f1729 0%, #1a1040 50%, #0f1729 100%)' }}>
+      <div className={`enterprise-hero-gradient relative overflow-hidden rounded-2xl border ${isLight ? 'border-gray-200 shadow-sm' : 'border-white/5'}`} style={{ background: isLight ? 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f8fafc 100%)' : 'linear-gradient(135deg, #0f1729 0%, #1a1040 50%, #0f1729 100%)' }}>
         <div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(ellipse at 20% 50%, #3b82f6 0%, transparent 50%), radial-gradient(ellipse at 80% 50%, #8b5cf6 0%, transparent 50%)' }} />
         <div className="relative px-6 py-6 sm:px-8 sm:py-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -209,9 +258,9 @@ export default function SolutaekifaeriPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                   </svg>
                 </div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">Sölurás</h1>
+                <h1 className={`text-2xl font-bold tracking-tight ${isLight ? 'text-gray-900' : 'text-white'}`}>Sölurás</h1>
               </div>
-              <p className="text-sm text-white/40 ml-[52px]">Sölutækifæri, herferðir og viðskiptaþróun</p>
+              <p className={`text-sm ml-[52px] ${isLight ? 'text-gray-500' : 'text-white/40'}`}>Sölutækifæri, herferðir og viðskiptaþróun</p>
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -229,135 +278,282 @@ export default function SolutaekifaeriPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link href="/samningar" className="enterprise-stat-gradient group relative overflow-hidden rounded-xl border border-white/5 p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/5 block" style={{ background: 'linear-gradient(135deg, #161822 0%, #0f1729 100%)' }}>
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 -translate-y-6 translate-x-6 transition-transform group-hover:scale-125" style={{ background: 'radial-gradient(circle, #22c55e, transparent)' }} />
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-500/10">
-                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span className="text-[11px] font-medium text-white/40 uppercase tracking-wider">Sölurás</span>
-            </div>
-            <div className="text-xl font-bold text-emerald-400 mb-1">{formatCurrency(pipalineVerdmaeti)}</div>
-            <div className="flex items-center gap-1.5 text-[11px] text-white/30 group-hover:text-emerald-400/60 transition-colors">
-              <span>Skoða samninga</span>
-              <svg className="w-3 h-3 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-            </div>
-          </div>
-        </Link>
+      {/* Stats Grid - Actionable KPIs */}
+      {(() => {
+        const overdueItems = opinSolutaekifaeri.filter(s => isOverdue(s.naestiKontaktur));
+        const avgDays = opinSolutaekifaeri.length > 0
+          ? Math.round(opinSolutaekifaeri.reduce((sum, s) => sum + getDaysInStage(s.dagsetning), 0) / opinSolutaekifaeri.length)
+          : 0;
 
-        <Link href="/vidskiptavinir" className="enterprise-stat-gradient group relative overflow-hidden rounded-xl border border-white/5 p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/5 block" style={{ background: 'linear-gradient(135deg, #161822 0%, #0f1729 100%)' }}>
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 -translate-y-6 translate-x-6 transition-transform group-hover:scale-125" style={{ background: 'radial-gradient(circle, #3b82f6, transparent)' }} />
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/10">
-                <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <span className="text-[11px] font-medium text-white/40 uppercase tracking-wider">Opin tækifæri</span>
-            </div>
-            <div className="text-xl font-bold text-blue-400 mb-1">{opinSolutaekifaeri.length}</div>
-            <div className="flex items-center gap-1.5 text-[11px] text-white/30 group-hover:text-blue-400/60 transition-colors">
-              <span>Viðskiptavinir</span>
-              <svg className="w-3 h-3 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-            </div>
-          </div>
-        </Link>
+        const statCards: { id: ActiveFilter; label: string; value: string | number; sub: string; color: string; glowColor: string; iconPath: string; highlight?: boolean; suffix?: string }[] = [
+          {
+            id: 'opin', label: 'Verðmæti í rás', value: formatCurrency(pipalineVerdmaeti),
+            sub: `${opinSolutaekifaeri.length} opin tækifæri`, color: '#22c55e', glowColor: '#22c55e',
+            iconPath: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+          },
+          {
+            id: 'unnid', label: 'Sigurhlutfall', value: `${winRate}%`,
+            sub: `${formatCurrency(wonVerdmaeti)} unnið`, color: '#3b82f6', glowColor: '#3b82f6',
+            iconPath: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
+          },
+          {
+            id: 'eldest', label: 'Meðalaldur deals', value: avgDays,
+            sub: 'Meðaltími í sölurás', color: '#8b5cf6', glowColor: '#8b5cf6',
+            iconPath: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', suffix: 'dagar',
+          },
+          {
+            id: 'overdue', label: 'Þarfnast athygli', value: overdueItems.length,
+            sub: overdueItems.length > 0 ? 'Tímafrestur liðinn' : 'Allt á hreinu',
+            color: overdueItems.length > 0 ? '#ef4444' : '#f59e0b',
+            glowColor: overdueItems.length > 0 ? '#ef4444' : '#f59e0b',
+            iconPath: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
+            highlight: overdueItems.length > 0,
+          },
+        ];
 
-        <Link href="/malaskraning" className="enterprise-stat-gradient group relative overflow-hidden rounded-xl border border-white/5 p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-amber-500/5 block" style={{ background: 'linear-gradient(135deg, #161822 0%, #0f1729 100%)' }}>
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 -translate-y-6 translate-x-6 transition-transform group-hover:scale-125" style={{ background: 'radial-gradient(circle, #f59e0b, transparent)' }} />
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-500/10">
-                <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+        return (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {statCards.map(card => {
+                const isActive = activeFilter === card.id;
+                return (
+                  <button
+                    key={card.id}
+                    onClick={() => setActiveFilter(prev => prev === card.id ? 'none' : card.id)}
+                    className={`group relative overflow-hidden rounded-xl border p-5 transition-all duration-300 hover:scale-[1.02] text-left ${
+                      isActive
+                        ? 'ring-2 ring-offset-1 ring-offset-transparent'
+                        : card.highlight
+                          ? isLight ? 'border-red-200' : 'border-red-500/20'
+                          : isLight ? 'border-gray-200' : 'border-white/5'
+                    }`}
+                    style={{
+                      background: isLight
+                        ? (card.highlight ? '#fff5f5' : '#ffffff')
+                        : (card.highlight
+                          ? 'linear-gradient(135deg, #1a1222 0%, #1c0f1f 100%)'
+                          : 'linear-gradient(135deg, #161822 0%, #0f1729 100%)'),
+                      ...(isActive ? { ringColor: card.color, borderColor: card.color + '60' } : {}),
+                      borderColor: isActive ? card.color + '60' : undefined,
+                      ...(isLight && !isActive ? { boxShadow: '0 1px 3px rgba(0,0,0,0.06)' } : {}),
+                    }}
+                  >
+                    {isActive && (
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: card.color + '20' }}>
+                        <svg className="w-3 h-3" style={{ color: card.color }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    )}
+                    <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 -translate-y-6 translate-x-6" style={{ background: `radial-gradient(circle, ${card.glowColor}, transparent)` }} />
+                    <div className="relative">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: card.color + '15' }}>
+                          <svg className="w-4 h-4" style={{ color: card.color }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d={card.iconPath} />
+                          </svg>
+                        </div>
+                        <span className={`text-[11px] font-medium uppercase tracking-wider ${isLight ? 'text-gray-500' : 'text-white/40'}`}>{card.label}</span>
+                      </div>
+                      <div className="text-xl font-bold mb-1" style={{ color: card.color }}>
+                        {card.value}
+                        {card.suffix && <span className={`text-sm font-normal ml-1 ${isLight ? 'text-gray-400' : 'text-white/30'}`}>{card.suffix}</span>}
+                      </div>
+                      <div className={`text-[11px] ${isLight ? 'text-gray-400' : 'text-white/30'}`}>{card.sub}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {activeFilter !== 'none' && (
+              <div className="flex items-center gap-2 px-1">
+                <span className={`text-[11px] ${isLight ? 'text-gray-500' : 'text-white/40'}`}>
+                  Sýnir: <span className={`font-medium ${isLight ? 'text-gray-700' : 'text-white/70'}`}>
+                    {activeFilter === 'opin' ? 'Opin tækifæri' : activeFilter === 'unnid' ? 'Unnin tækifæri' : activeFilter === 'eldest' ? 'Raðað eftir aldri' : 'Tímafrestur liðinn'}
+                  </span>
+                  <span className={isLight ? 'text-gray-400' : 'text-white/30'}> · {filteredSoList.length} tækifæri</span>
+                </span>
+                <button
+                  onClick={() => setActiveFilter('none')}
+                  className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${isLight ? 'bg-gray-100 text-gray-500 hover:text-gray-700 hover:bg-gray-200' : 'bg-white/5 text-white/40 hover:text-white/70 hover:bg-white/10'}`}
+                >
+                  Hreinsa filter
+                </button>
               </div>
-              <span className="text-[11px] font-medium text-white/40 uppercase tracking-wider">Opin mál</span>
-            </div>
-            <div className="text-xl font-bold text-amber-400 mb-1">{opinMal.length}</div>
-            <div className="flex items-center gap-1.5 text-[11px] text-white/30 group-hover:text-amber-400/60 transition-colors">
-              <span>Málaskráning</span>
-              <svg className="w-3 h-3 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-            </div>
+            )}
           </div>
-        </Link>
+        );
+      })()}
 
-        <Link href="/skyrslur" className="enterprise-stat-gradient group relative overflow-hidden rounded-xl border border-white/5 p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/5 block" style={{ background: 'linear-gradient(135deg, #161822 0%, #0f1729 100%)' }}>
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 -translate-y-6 translate-x-6 transition-transform group-hover:scale-125" style={{ background: 'radial-gradient(circle, #8b5cf6, transparent)' }} />
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-500/10">
-                <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <span className="text-[11px] font-medium text-white/40 uppercase tracking-wider">Á póstlistum</span>
-            </div>
-            <div className="text-xl font-bold text-purple-400 mb-1">{Object.values(leadTags).filter(lt => lt.postlistar.length > 0).length}</div>
-            <div className="flex items-center gap-1.5 text-[11px] text-white/30 group-hover:text-purple-400/60 transition-colors">
-              <span>Skýrslur</span>
-              <svg className="w-3 h-3 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+      {/* Pipeline Funnel + Team Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Pipeline Funnel */}
+        <div className={`lg:col-span-2 rounded-xl border px-5 py-4 ${isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-[#161822] border-white/5'}`}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h3 className={`text-sm font-semibold ${isLight ? 'text-gray-900' : 'text-white'}`}>Sölurás</h3>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${isLight ? 'bg-gray-100 text-gray-500' : 'bg-white/5 text-white/40'}`}>{filteredSoList.length} tækifæri</span>
             </div>
           </div>
-        </Link>
+          <div className="space-y-2">
+            {PIPELINE_COLUMNS.filter(col => col.stig !== 'lokað tapað').map((col, idx, arr) => {
+              const items = filteredSoList.filter(s => s.stig === col.stig);
+              const colValue = items.reduce((sum, s) => sum + s.verdmaeti, 0);
+              const maxCount = Math.max(...arr.map(c => filteredSoList.filter(s => s.stig === c.stig).length), 1);
+              const barWidth = Math.max((items.length / maxCount) * 100, 8);
+              const nextCol = arr[idx + 1];
+              const nextCount = nextCol ? filteredSoList.filter(s => s.stig === nextCol.stig).length : 0;
+              const conversionRate = items.length > 0 && nextCol ? Math.round((nextCount / items.length) * 100) : null;
+
+              return (
+                <div key={col.stig}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: col.accent + '15' }}>
+                      <svg className="w-3.5 h-3.5" style={{ color: col.accent }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d={col.icon} />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-medium ${isLight ? 'text-gray-700' : 'text-white/70'}`}>{col.label}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold" style={{ backgroundColor: col.accent + '15', color: col.accent }}>{items.length}</span>
+                        </div>
+                        <span className="text-xs font-semibold text-emerald-400/80">{formatCurrency(colValue)}</span>
+                      </div>
+                      <div className={`h-2 rounded-full overflow-hidden ${isLight ? 'bg-gray-100' : 'bg-white/5'}`}>
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${barWidth}%`, backgroundColor: col.accent }} />
+                      </div>
+                    </div>
+                  </div>
+                  {conversionRate !== null && (
+                    <div className="flex items-center gap-2 ml-10 my-1">
+                      <svg className={`w-3 h-3 ${isLight ? 'text-gray-300' : 'text-white/15'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                      <span className={`text-[10px] ${isLight ? 'text-gray-400' : 'text-white/25'}`}>{conversionRate}% umbreyting</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {(() => {
+              const lostItems = filteredSoList.filter(s => s.stig === 'lokað tapað');
+              const lostCol = PIPELINE_COLUMNS.find(c => c.stig === 'lokað tapað');
+              if (!lostCol || lostItems.length === 0) return null;
+              return (
+                <div className={`flex items-center gap-3 pt-2 mt-1 border-t ${isLight ? 'border-gray-100' : 'border-white/5'}`}>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: lostCol.accent + '15' }}>
+                    <svg className="w-3.5 h-3.5" style={{ color: lostCol.accent }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d={lostCol.icon} />
+                    </svg>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${isLight ? 'text-gray-500' : 'text-white/40'}`}>{lostCol.label}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold" style={{ backgroundColor: lostCol.accent + '15', color: lostCol.accent }}>{lostItems.length}</span>
+                    <span className="text-xs text-red-400/60">{formatCurrency(lostItems.reduce((s, i) => s + i.verdmaeti, 0))}</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Team Overview */}
+        <div className={`rounded-xl border px-5 py-4 ${isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-[#161822] border-white/5'}`}>
+          <div className="flex items-center gap-3 mb-4">
+            <h3 className={`text-sm font-semibold ${isLight ? 'text-gray-900' : 'text-white'}`}>Söluliðið</h3>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full ${isLight ? 'bg-gray-100 text-gray-500' : 'bg-white/5 text-white/40'}`}>{SALES_TEAM.length}</span>
+          </div>
+          <div className="space-y-3">
+            {SALES_TEAM.map(member => {
+              const memberOpps = soList.filter(s => OPPORTUNITY_OWNERS[s.id] === member.id);
+              const memberOpen = memberOpps.filter(s => s.stig !== 'lokað tapað' && s.stig !== 'lokað unnið');
+              const memberValue = memberOpen.reduce((sum, s) => sum + s.verdmaeti, 0);
+              const memberOverdue = memberOpen.filter(s => isOverdue(s.naestiKontaktur));
+              return (
+                <div key={member.id} className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${isLight ? 'hover:bg-gray-50' : 'hover:bg-white/[0.03]'}`}>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${member.litur}, ${member.litur}aa)` }}>
+                    {member.initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-medium truncate ${isLight ? 'text-gray-700' : 'text-white/80'}`}>{member.nafn}</span>
+                      {memberOverdue.length > 0 && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-400 font-medium">{memberOverdue.length} seinkar</span>
+                      )}
+                    </div>
+                    <div className={`text-[10px] ${isLight ? 'text-gray-400' : 'text-white/30'}`}>{member.titill}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-xs font-semibold text-emerald-400/80">{formatCurrency(memberValue)}</div>
+                    <div className={`text-[10px] ${isLight ? 'text-gray-400' : 'text-white/30'}`}>{memberOpen.length} opin</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* Pipeline Summary Bar */}
-      <div className="bg-[#161822] rounded-xl border border-white/5 px-5 py-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <h3 className="text-sm font-semibold text-white">Söluferill</h3>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/40">{soList.length} tækifæri</span>
-          </div>
-          <div className="flex items-center gap-4 text-[11px]">
-            <div className="flex items-center gap-1.5">
-              <span className="text-white/40">Sigurhlutfall:</span>
-              <span className="font-semibold text-emerald-400">{winRate}%</span>
+      {/* Upcoming Actions */}
+      {(() => {
+        const upcoming = [...opinSolutaekifaeri]
+          .sort((a, b) => new Date(a.naestiKontaktur).getTime() - new Date(b.naestiKontaktur).getTime())
+          .slice(0, 4);
+        if (upcoming.length === 0) return null;
+        return (
+          <div className={`rounded-xl border px-5 py-4 ${isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-[#161822] border-white/5'}`}>
+            <div className="flex items-center gap-3 mb-3">
+              <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <h3 className={`text-sm font-semibold ${isLight ? 'text-gray-900' : 'text-white'}`}>Næstu aðgerðir</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {upcoming.map(s => {
+                const f = getFyrirtaeki(s.fyrirtaekiId);
+                const owner = getOwner(s.id);
+                const overdue = isOverdue(s.naestiKontaktur);
+                const col = PIPELINE_COLUMNS.find(c => c.stig === s.stig);
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => openDetail(s)}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 hover:-translate-y-0.5 ${
+                      isLight
+                        ? `hover:shadow-md ${overdue ? 'border-red-200 bg-red-50/50' : 'border-gray-200 bg-gray-50/50 hover:bg-gray-50'}`
+                        : `hover:shadow-lg hover:shadow-black/20 ${overdue ? 'border-red-500/20 bg-red-500/[0.03]' : 'border-white/5 bg-white/[0.02]'}`
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${overdue ? 'bg-red-500/15 text-red-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                        {overdue ? 'Tímafrestur liðinn' : formatDate(s.naestiKontaktur)}
+                      </span>
+                      {col && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: col.accent }} />}
+                    </div>
+                    <div className={`text-xs font-medium truncate mb-0.5 ${isLight ? 'text-gray-800' : 'text-white/80'}`}>{s.titill}</div>
+                    <div className={`text-[10px] truncate mb-2 ${isLight ? 'text-gray-400' : 'text-white/30'}`}>{f?.nafn}</div>
+                    {owner && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-4 h-4 rounded flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: owner.litur }}>
+                          {owner.initials}
+                        </div>
+                        <span className={`text-[10px] ${isLight ? 'text-gray-400' : 'text-white/30'}`}>{owner.nafn}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </div>
-        <div className="flex rounded-full overflow-hidden h-2 bg-white/5">
-          {PIPELINE_COLUMNS.map(col => {
-            const count = soList.filter(s => s.stig === col.stig).length;
-            const pct = soList.length > 0 ? (count / soList.length) * 100 : 0;
-            return pct > 0 ? (
-              <div
-                key={col.stig}
-                className="transition-all duration-500 first:rounded-l-full last:rounded-r-full"
-                style={{ width: `${pct}%`, backgroundColor: col.accent }}
-                title={`${col.label}: ${count}`}
-              />
-            ) : null;
-          })}
-        </div>
-        <div className="flex gap-4 mt-2.5">
-          {PIPELINE_COLUMNS.map(col => {
-            const count = soList.filter(s => s.stig === col.stig).length;
-            return (
-              <div key={col.stig} className="flex items-center gap-1.5 text-[10px] text-white/40">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: col.accent }} />
-                <span>{col.label}</span>
-                <span className="font-semibold text-white/60">{count}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Pipeline Views */}
-      <div className="bg-[#161822] rounded-xl border border-white/5 overflow-hidden">
-        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+      <div className={`rounded-xl border overflow-hidden ${isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-[#161822] border-white/5'}`}>
+        <div className={`px-6 py-4 border-b flex items-center justify-between ${isLight ? 'border-gray-100' : 'border-white/5'}`}>
           <div className="flex items-center gap-3">
-            <svg className="w-5 h-5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className={`w-5 h-5 ${isLight ? 'text-gray-400' : 'text-white/40'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
             </svg>
-            <h2 className="text-sm font-semibold text-white">Sölurás</h2>
+            <h2 className={`text-sm font-semibold ${isLight ? 'text-gray-900' : 'text-white'}`}>Sölurás</h2>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -370,15 +566,15 @@ export default function SolutaekifaeriPage() {
               </svg>
               Stofna nýtt
             </button>
-            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+            <div className={`flex items-center gap-1 rounded-lg p-1 ${isLight ? 'bg-gray-100' : 'bg-white/5'}`}>
               {VIEW_OPTIONS.map(v => (
                 <button
                   key={v.key}
                   onClick={() => setViewMode(v.key)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all duration-200 ${
                     viewMode === v.key
-                      ? 'bg-blue-500/20 text-blue-400 shadow-sm'
-                      : 'text-white/40 hover:text-white/60 hover:bg-white/5'
+                      ? isLight ? 'bg-white text-blue-600 shadow-sm' : 'bg-blue-500/20 text-blue-400 shadow-sm'
+                      : isLight ? 'text-gray-400 hover:text-gray-600 hover:bg-white/60' : 'text-white/40 hover:text-white/60 hover:bg-white/5'
                   }`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -396,7 +592,7 @@ export default function SolutaekifaeriPage() {
         <div className="overflow-x-auto">
           <div className="flex min-w-max gap-3 p-4">
             {PIPELINE_COLUMNS.map((col, colIdx) => {
-              const items = soList.filter(s => s.stig === col.stig);
+              const items = filteredSoList.filter(s => s.stig === col.stig);
               const colValue = items.reduce((sum, s) => sum + s.verdmaeti, 0);
               return (
                 <div
@@ -416,11 +612,11 @@ export default function SolutaekifaeriPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-white">{col.label}</span>
+                        <span className={`text-xs font-semibold ${isLight ? 'text-gray-800' : 'text-white'}`}>{col.label}</span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: col.accent + '15', color: col.accent }}>{items.length}</span>
                       </div>
                       {items.length > 0 && (
-                        <div className="text-[10px] text-white/30 mt-0.5">{formatCurrency(colValue)}</div>
+                        <div className={`text-[10px] mt-0.5 ${isLight ? 'text-gray-400' : 'text-white/30'}`}>{formatCurrency(colValue)}</div>
                       )}
                     </div>
                   </div>
@@ -430,58 +626,86 @@ export default function SolutaekifaeriPage() {
                     {items.map((s, idx) => {
                       const f = getFyrirtaeki(s.fyrirtaekiId);
                       const tags = leadTags[s.id];
+                      const owner = getOwner(s.id);
+                      const days = getDaysInStage(s.dagsetning);
+                      const overdue = isOverdue(s.naestiKontaktur);
+                      const tengiliður = f?.tengiliðir.find(t => t.id === s.tengiliðurId);
                       return (
                         <div
                           key={s.id}
                           onClick={() => openDetail(s)}
-                          className="group bg-[#161822] rounded-xl p-3.5 border border-white/5 hover:border-white/15 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5"
+                          className={`group rounded-xl p-3.5 border transition-all duration-200 cursor-pointer hover:-translate-y-0.5 ${
+                            isLight
+                              ? `bg-white hover:shadow-md ${overdue ? 'border-red-200 hover:border-red-300' : 'border-gray-200 hover:border-gray-300'}`
+                              : `bg-[#161822] hover:shadow-lg hover:shadow-black/20 ${overdue ? 'border-red-500/20 hover:border-red-500/30' : 'border-white/5 hover:border-white/15'}`
+                          }`}
                           style={{
                             animationDelay: `${colIdx * 60 + idx * 40}ms`,
                           }}
                         >
+                          {/* Overdue warning */}
+                          {overdue && (
+                            <div className="flex items-center gap-1.5 text-[9px] font-medium text-red-400 bg-red-500/10 rounded-md px-2 py-1 mb-2">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01" /></svg>
+                              Tímafrestur liðinn
+                            </div>
+                          )}
+
                           {/* Title & company */}
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-white truncate leading-tight">{s.titill}</div>
-                              <div className="text-[11px] text-white/40 mt-0.5 flex items-center gap-1.5">
+                              <div className={`text-sm font-medium truncate leading-tight ${isLight ? 'text-gray-800' : 'text-white'}`}>{s.titill}</div>
+                              <div className={`text-[11px] mt-0.5 flex items-center gap-1.5 ${isLight ? 'text-gray-500' : 'text-white/40'}`}>
                                 <span className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold" style={{ backgroundColor: col.accent + '20', color: col.accent }}>
                                   {f?.nafn?.charAt(0) || '?'}
                                 </span>
                                 <span className="truncate">{f?.nafn}</span>
                               </div>
                             </div>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-md shrink-0 ${isLight ? 'bg-gray-100 text-gray-400' : 'bg-white/5 text-white/30'}`}>{days}d</span>
                           </div>
 
-                          {/* Value */}
+                          {/* Contact person */}
+                          {tengiliður && (
+                            <div className={`text-[10px] mb-2 flex items-center gap-1 ${isLight ? 'text-gray-400' : 'text-white/30'}`}>
+                              <svg className={`w-3 h-3 ${isLight ? 'text-gray-300' : 'text-white/20'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                              <span className="truncate">{tengiliður.nafn} · {tengiliður.titill}</span>
+                            </div>
+                          )}
+
+                          {/* Value + next contact */}
                           <div className="flex items-center justify-between mb-2">
                             <div className="text-sm font-bold text-emerald-400">{formatCurrency(s.verdmaeti)}</div>
+                            <div className={`flex items-center gap-1 text-[10px] ${overdue ? 'text-red-400' : isLight ? 'text-gray-400' : 'text-white/30'}`}>
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span>{formatDate(s.naestiKontaktur)}</span>
+                            </div>
                           </div>
 
-                          {/* Date */}
-                          <div className="flex items-center gap-1.5 text-[10px] text-white/30 mb-2">
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span>{formatDate(s.naestiKontaktur)}</span>
-                          </div>
-
-                          {/* Tags */}
-                          {tags && (
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {(() => {
+                          {/* Tags + Owner */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex flex-wrap gap-1">
+                              {tags && (() => {
                                 const hsData = HITASTIG_OPTIONS.find(h => h.key === tags.hitastig);
                                 return hsData ? <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: hsData.color + '15', color: hsData.color }}>{hsData.label}</span> : null;
                               })()}
-                              {tags.vip && <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: VIP_COLOR + '15', color: VIP_COLOR }}>VIP</span>}
-                              {tags.markhopar.slice(0, 2).map(mk => {
+                              {tags?.vip && <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: VIP_COLOR + '15', color: VIP_COLOR }}>VIP</span>}
+                              {tags?.markhopar.slice(0, 1).map(mk => {
                                 const mkData = markhópar.find(m => m.key === mk);
                                 return mkData ? <span key={mk} className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: mkData.color + '10', color: mkData.color }}>{mkData.label}</span> : null;
                               })}
                             </div>
-                          )}
+                            {owner && (
+                              <div className="w-5 h-5 rounded flex items-center justify-center text-[7px] font-bold text-white shrink-0" style={{ backgroundColor: owner.litur }} title={owner.nafn}>
+                                {owner.initials}
+                              </div>
+                            )}
+                          </div>
 
                           {/* Quick actions */}
-                          <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 pt-1 border-t border-white/5">
+                          <div className={`flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 pt-1 border-t ${isLight ? 'border-gray-100' : 'border-white/5'}`}>
                             <button onClick={(e) => { e.stopPropagation(); openEmail(s); }} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 transition-colors text-[10px] font-medium text-blue-400">
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                               Póstur
@@ -490,10 +714,10 @@ export default function SolutaekifaeriPage() {
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                               Hringja
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); setEditingST(s); }} className="flex items-center justify-center p-1.5 rounded-lg bg-white/5 hover:bg-blue-500/15 transition-colors text-white/40 hover:text-blue-400" title="Breyta">
+                            <button onClick={(e) => { e.stopPropagation(); setEditingST(s); }} className={`flex items-center justify-center p-1.5 rounded-lg transition-colors hover:bg-blue-500/15 hover:text-blue-400 ${isLight ? 'bg-gray-100 text-gray-400' : 'bg-white/5 text-white/40'}`} title="Breyta">
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); setDeletingST(s); }} className="flex items-center justify-center p-1.5 rounded-lg bg-white/5 hover:bg-red-500/15 transition-colors text-white/40 hover:text-red-400" title="Eyða">
+                            <button onClick={(e) => { e.stopPropagation(); setDeletingST(s); }} className={`flex items-center justify-center p-1.5 rounded-lg transition-colors hover:bg-red-500/15 hover:text-red-400 ${isLight ? 'bg-gray-100 text-gray-400' : 'bg-white/5 text-white/40'}`} title="Eyða">
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             </button>
                           </div>
@@ -501,7 +725,7 @@ export default function SolutaekifaeriPage() {
                       );
                     })}
                     {items.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-8 text-white/20">
+                      <div className={`flex flex-col items-center justify-center py-8 ${isLight ? 'text-gray-300' : 'text-white/20'}`}>
                         <svg className="w-8 h-8 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                         </svg>
@@ -518,12 +742,12 @@ export default function SolutaekifaeriPage() {
 
         {/* Pie/Chart View */}
         {viewMode === 'pie' && (
-          <ChartView soList={soList} columns={PIPELINE_COLUMNS} />
+          <ChartView soList={filteredSoList} columns={PIPELINE_COLUMNS} />
         )}
 
         {/* Table View */}
         {viewMode === 'table' && (
-          <TableView soList={soList} columns={PIPELINE_COLUMNS} onSelect={openDetail} onEdit={setEditingST} onDelete={setDeletingST} />
+          <TableView soList={filteredSoList} columns={PIPELINE_COLUMNS} onSelect={openDetail} onEdit={setEditingST} onDelete={setDeletingST} />
         )}
       </div>
 
@@ -788,6 +1012,7 @@ function TableView({ soList, columns, onSelect, onEdit, onDelete }: {
             <th className="text-right px-4 py-3"><SortHeader label="Verðmæti" field="verdmaeti" /></th>
             <th className="text-left px-4 py-3 hidden lg:table-cell"><SortHeader label="Dagsetning" field="dagsetning" /></th>
             <th className="text-left px-4 py-3 hidden lg:table-cell"><span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Næsta snerting</span></th>
+            <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Ábyrgð</span></th>
             <th className="text-right px-4 py-3"><span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Aðgerðir</span></th>
           </tr>
         </thead>
@@ -825,7 +1050,22 @@ function TableView({ soList, columns, onSelect, onEdit, onDelete }: {
                   <span className="text-xs text-white/40">{formatDate(s.dagsetning)}</span>
                 </td>
                 <td className="px-4 py-3 hidden lg:table-cell">
-                  <span className="text-xs text-orange-500">{formatDate(s.naestiKontaktur)}</span>
+                  <span className={`text-xs ${isOverdue(s.naestiKontaktur) ? 'text-red-400 font-medium' : 'text-orange-500'}`}>
+                    {formatDate(s.naestiKontaktur)}
+                    {isOverdue(s.naestiKontaktur) && <span className="text-[9px] ml-1 text-red-400/70">seint</span>}
+                  </span>
+                </td>
+                <td className="px-4 py-3 hidden md:table-cell">
+                  {(() => {
+                    const owner = getOwner(s.id);
+                    if (!owner) return <span className="text-xs text-white/20">-</span>;
+                    return (
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded flex items-center justify-center text-[8px] font-bold text-white" style={{ backgroundColor: owner.litur }}>{owner.initials}</div>
+                        <span className="text-xs text-white/50">{owner.nafn.split(' ')[0]}</span>
+                      </div>
+                    );
+                  })()}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -988,26 +1228,99 @@ function DetailPanel({ st, tags, markhóparList, onClose, onToggleMarkhópur, on
                 </div>
               )}
 
+              {/* Ábyrgðaraðili */}
+              {(() => {
+                const owner = getOwner(st.id);
+                if (!owner) return null;
+                return (
+                  <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                    <div className="text-xs font-medium text-white/40 mb-3">Ábyrgðaraðili</div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold text-white" style={{ background: `linear-gradient(135deg, ${owner.litur}, ${owner.litur}aa)` }}>{owner.initials}</div>
+                      <div>
+                        <div className="text-sm font-medium text-white">{owner.nafn}</div>
+                        <div className="text-xs text-white/50">{owner.titill}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Staða og framvinda */}
               {st.ferlSkrefs.length > 0 && (
                 <div>
-                  <div className="text-xs font-medium text-white/40 mb-3">Söluferill</div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-xs font-medium text-white/40">Söluferli</div>
+                    <div className="text-[10px] text-white/30">
+                      {st.ferlSkrefs.filter(fs => fs.status === 'lokið').length}/{st.ferlSkrefs.length} skref lokið
+                    </div>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="h-1.5 rounded-full bg-white/5 mb-4 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${(st.ferlSkrefs.filter(fs => fs.status === 'lokið').length / st.ferlSkrefs.length) * 100}%`,
+                        background: `linear-gradient(90deg, ${getStatusColor(st.stig)}, ${getStatusColor(st.stig)}80)`,
+                      }}
+                    />
+                  </div>
                   <div className="space-y-0 border-l-2 border-white/5 ml-2">
-                    {st.ferlSkrefs.map(fs => (
-                      <div key={fs.id} className="flex items-start gap-3 pl-4 py-2 relative">
-                        <div className="absolute left-0 top-1/2 -translate-x-[5px] -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 transition-colors" style={{ borderColor: getStatusColor(fs.status), backgroundColor: fs.status === 'lokið' ? getStatusColor(fs.status) : 'transparent' }} />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-sm ${fs.status === 'bíður' ? 'text-white/40' : 'text-white/70'}`}>{fs.nafn}</span>
-                            {fs.sjálfvirkt && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-400">Sjálfvirkt</span>}
+                    {st.ferlSkrefs.map((fs, idx) => {
+                      const statusIcons: Record<string, string> = {
+                        'lokið': 'M5 13l4 4L19 7',
+                        'í gangi': 'M13 10V3L4 14h7v7l9-11h-7z',
+                        'bíður': 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+                        'áætlað': 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+                      };
+                      const statusLabels: Record<string, string> = {
+                        'lokið': 'Lokið',
+                        'í gangi': 'Í gangi',
+                        'bíður': 'Bíður',
+                        'áætlað': 'Áætlað',
+                      };
+                      return (
+                        <div key={fs.id} className={`flex items-start gap-3 pl-4 py-2.5 relative ${idx === st.ferlSkrefs.length - 1 ? '' : ''}`}>
+                          <div
+                            className="absolute left-0 top-1/2 -translate-x-[5px] -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 transition-colors"
+                            style={{ borderColor: getStatusColor(fs.status), backgroundColor: fs.status === 'lokið' ? getStatusColor(fs.status) : 'transparent' }}
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-medium ${fs.status === 'lokið' ? 'text-white/70' : fs.status === 'í gangi' ? 'text-white' : 'text-white/35'}`}>{fs.nafn}</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium flex items-center gap-1" style={{ backgroundColor: getStatusColor(fs.status) + '15', color: getStatusColor(fs.status) }}>
+                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d={statusIcons[fs.status] || ''} /></svg>
+                                {statusLabels[fs.status] || fs.status}
+                              </span>
+                              {fs.sjálfvirkt && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400/70">Sjálfvirkt</span>}
+                            </div>
+                            {fs.lýsing && <div className="text-xs text-white/40 mt-0.5">{fs.lýsing}</div>}
+                            {fs.dagsetning && <div className="text-[10px] text-white/25 mt-0.5">{formatDate(fs.dagsetning)}</div>}
                           </div>
-                          {fs.lýsing && <div className="text-xs text-white/40 mt-0.5">{fs.lýsing}</div>}
-                          {fs.dagsetning && <div className="text-xs text-white/30 mt-0.5">{formatDate(fs.dagsetning)}</div>}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
+
+              {/* Aldur og tímalína */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white/5 rounded-xl px-3 py-2.5 border border-white/5 text-center">
+                  <div className="text-lg font-bold text-white/70">{getDaysInStage(st.dagsetning)}</div>
+                  <div className="text-[10px] text-white/30">dagar í rás</div>
+                </div>
+                <div className="bg-white/5 rounded-xl px-3 py-2.5 border border-white/5 text-center">
+                  <div className="text-lg font-bold text-white/70">{st.ferlSkrefs.filter(fs => fs.status === 'lokið').length}</div>
+                  <div className="text-[10px] text-white/30">skref lokið</div>
+                </div>
+                <div className={`rounded-xl px-3 py-2.5 border text-center ${isOverdue(st.naestiKontaktur) ? 'bg-red-500/10 border-red-500/20' : 'bg-white/5 border-white/5'}`}>
+                  <div className={`text-lg font-bold ${isOverdue(st.naestiKontaktur) ? 'text-red-400' : 'text-amber-400'}`}>
+                    {Math.abs(Math.floor((new Date(st.naestiKontaktur).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))}
+                  </div>
+                  <div className="text-[10px] text-white/30">{isOverdue(st.naestiKontaktur) ? 'dagar seint' : 'dagar til næstu'}</div>
+                </div>
+              </div>
 
               <div className="flex gap-3">
                 <button onClick={onOpenEmail} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-[1.02]" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15))', color: '#60a5fa' }}>

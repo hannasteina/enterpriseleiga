@@ -1103,6 +1103,164 @@ export const fyrrverandiVidskiptavinir: FyrrverandiVidskiptavinur[] = [
   { id: 'fv4', nafn: 'Stefnir hf.', kennitala: '501202-2140', sidastiSamningur: '2025-11-30', astaeða: 'Samningur rann út', fjoldiBila: 3, pipiTegund: 'langtimaleiga' },
 ];
 
+// ============ KVÖRTUNARFERLI (CRM COMPLAINT MANAGEMENT) ============
+
+export type KvortunSkrefStatus = 'lokið' | 'í gangi' | 'bíður';
+export type KvortunAlvarleiki = 'lágur' | 'miðlungs' | 'hár' | 'alvarlegt';
+export type KvortunBaeturTegund = 'afsláttur' | 'ókeypis þjónusta' | 'bílaskipti' | 'greiðslufrestur' | 'annað';
+export type KvortunSamskiptiStefna = 'inn' | 'út';
+export type KvortunFlokkur = 'þjónusta' | 'bíll' | 'samningur' | 'verð' | 'afhending' | 'samskipti' | 'annað';
+
+export interface KvortunSkref {
+  id: string;
+  nafn: string;
+  lysing: string;
+  status: KvortunSkrefStatus;
+  dagsetning?: string;
+  notandi?: string;
+}
+
+export interface KvortunSamskipti {
+  id: string;
+  tegund: 'símtal' | 'tölvupóstur' | 'fundur' | 'innri athugasemd';
+  titill: string;
+  lysing: string;
+  dagsetning: string;
+  notandi: string;
+  stefna: KvortunSamskiptiStefna;
+}
+
+export interface KvortunBaetur {
+  id: string;
+  tegund: KvortunBaeturTegund;
+  lysing: string;
+  verdmaeti?: number;
+  samthykkt: boolean;
+  dagsetning: string;
+}
+
+export interface KvortunGreining {
+  flokkur: KvortunFlokkur;
+  orsok: string;
+  alvarleiki: KvortunAlvarleiki;
+  ahrif: string;
+  forvarnaradgerdir: string;
+}
+
+export interface KvortunAnaegjumat {
+  einkunn: number;
+  athugasemd: string;
+  dagsetning: string;
+}
+
+export interface KvortunFerill {
+  malId: string;
+  skref: KvortunSkref[];
+  samskipti: KvortunSamskipti[];
+  baetur: KvortunBaetur[];
+  greining?: KvortunGreining;
+  anaegjumat?: KvortunAnaegjumat;
+}
+
+export const KVORTUN_SKREF_NOFN = [
+  'Móttaka',
+  'Flokkun',
+  'Rannsókn',
+  'Úrlausn',
+  'Bætur',
+  'Eftirfylgni',
+] as const;
+
+export const kvortunFlokkurLabels: Record<KvortunFlokkur, string> = {
+  'þjónusta': 'Þjónusta',
+  'bíll': 'Bíll / Tæki',
+  'samningur': 'Samningur',
+  'verð': 'Verð / Gjöld',
+  'afhending': 'Afhending / Seinkun',
+  'samskipti': 'Samskipti / Framkoma',
+  'annað': 'Annað',
+};
+
+export const kvortunAlvarleikiLabels: Record<KvortunAlvarleiki, { label: string; color: string }> = {
+  'lágur': { label: 'Lágur', color: '#6b7280' },
+  'miðlungs': { label: 'Miðlungs', color: '#3b82f6' },
+  'hár': { label: 'Hár', color: '#f59e0b' },
+  'alvarlegt': { label: 'Alvarlegt', color: '#ef4444' },
+};
+
+export const kvortunBaeturTegundLabels: Record<KvortunBaeturTegund, string> = {
+  'afsláttur': 'Afsláttur af samningi',
+  'ókeypis þjónusta': 'Ókeypis þjónusta',
+  'bílaskipti': 'Bílaskipti / Varabíll',
+  'greiðslufrestur': 'Greiðslufrestur',
+  'annað': 'Annað',
+};
+
+export const kvortunFerillar: KvortunFerill[] = [
+  {
+    malId: 'm2',
+    skref: [
+      { id: 'ks1', nafn: 'Móttaka', lysing: 'Kvörtun móttekin frá Marel vegna hleðsluvandamála á Tesla Model Y', status: 'lokið', dagsetning: '2026-02-18', notandi: 'Sigurður' },
+      { id: 'ks2', nafn: 'Flokkun', lysing: 'Flokkað sem hár forgangur – bíll / tæki', status: 'lokið', dagsetning: '2026-02-18', notandi: 'Sigurður' },
+      { id: 'ks3', nafn: 'Rannsókn', lysing: '', status: 'í gangi', dagsetning: '2026-02-19', notandi: 'Helgi' },
+      { id: 'ks4', nafn: 'Úrlausn', lysing: '', status: 'bíður' },
+      { id: 'ks5', nafn: 'Bætur', lysing: '', status: 'bíður' },
+      { id: 'ks6', nafn: 'Eftirfylgni', lysing: '', status: 'bíður' },
+    ],
+    samskipti: [
+      { id: 'kss1', tegund: 'símtal', titill: 'Kvörtun móttekin', lysing: 'Anna Björk frá Marel hringdi og kvartaði yfir að Tesla Model Y (TM-702) hleðst ekki rétt. Bíllinn náir aðeins 60% hleðslu á hraðhleðslustöð. Þetta hefur verið vandamál í 2 vikur.', dagsetning: '2026-02-18T09:30:00', notandi: 'Sigurður', stefna: 'inn' },
+      { id: 'kss2', tegund: 'innri athugasemd', titill: 'Greining hafin', lysing: 'Haft samband við Tesla þjónustu. Þeir geta tekið á móti bílnum á föstudag. Mögulega BMS vandamál.', dagsetning: '2026-02-18T14:00:00', notandi: 'Helgi', stefna: 'út' },
+      { id: 'kss3', tegund: 'tölvupóstur', titill: 'Staðfesting á móttöku kvörtunar', lysing: 'Sent tölvupóst á Önnu Björk með staðfestingu á móttöku og upplýsingum um næstu skref.', dagsetning: '2026-02-18T15:20:00', notandi: 'Sigurður', stefna: 'út' },
+      { id: 'kss4', tegund: 'símtal', titill: 'Uppfærsla til viðskiptavinar', lysing: 'Hringt í Önnu Björk til að láta vita að Tesla þjónusta tekur á móti bílnum á föstudaginn. Boðum varabíl á meðan.', dagsetning: '2026-02-19T10:00:00', notandi: 'Sigurður', stefna: 'út' },
+    ],
+    baetur: [],
+    greining: {
+      flokkur: 'bíll',
+      orsok: 'Möguleg bilun í Battery Management System (BMS). Þarf staðfestingu frá Tesla þjónustu.',
+      alvarleiki: 'hár',
+      ahrif: 'Viðskiptavinur getur ekki nýtt bílinn til fullnustu. Áhrif á daglegan rekstur hjá Marel.',
+      forvarnaradgerdir: 'Taka upp reglulegt eftirlit á hleðsluvirkni allra rafbíla í flotanum.',
+    },
+  },
+  {
+    malId: 'm8',
+    skref: [
+      { id: 'ks7', nafn: 'Móttaka', lysing: 'Kvörtun móttekin frá Símanum vegna seinkunar á dekkjaskiptum', status: 'lokið', dagsetning: '2026-01-28', notandi: 'Sigurður' },
+      { id: 'ks8', nafn: 'Flokkun', lysing: 'Flokkað sem miðlungs – þjónusta / seinkun', status: 'lokið', dagsetning: '2026-01-28', notandi: 'Sigurður' },
+      { id: 'ks9', nafn: 'Rannsókn', lysing: 'Seinkun stafaði af dekkjaskorti hjá birgi. Viðskiptavinur beið 5 daga umfram áætlun.', status: 'lokið', dagsetning: '2026-01-30', notandi: 'Helgi' },
+      { id: 'ks10', nafn: 'Úrlausn', lysing: 'Dekkjaskipti framkvæmt. Bíll afhentur á réttum tíma eftir seinkun.', status: 'lokið', dagsetning: '2026-02-02', notandi: 'Helgi' },
+      { id: 'ks11', nafn: 'Bætur', lysing: 'Boðinn 10% afsláttur af næsta mánaðar leigu sem sáttabót.', status: 'lokið', dagsetning: '2026-02-03', notandi: 'Sigurður' },
+      { id: 'ks12', nafn: 'Eftirfylgni', lysing: 'Kristín Sól staðfesti ánægju. Mál lokað.', status: 'lokið', dagsetning: '2026-02-05', notandi: 'Sigurður' },
+    ],
+    samskipti: [
+      { id: 'kss5', tegund: 'símtal', titill: 'Kvörtun móttekin', lysing: 'Kristín Sól frá Símanum hringdi og kvartaði yfir seinkun á dekkjaskiptum. Dekkjaskipti átti að vera lokið 23. jan en er enn ekki tilbúið.', dagsetning: '2026-01-28T11:00:00', notandi: 'Sigurður', stefna: 'inn' },
+      { id: 'kss6', tegund: 'innri athugasemd', titill: 'Greining á seinkun', lysing: 'Kannaði stöðuna: Dekkjaskortur hjá birgi olli seinkun. Pantað í flýtipöntun.', dagsetning: '2026-01-29T09:00:00', notandi: 'Helgi', stefna: 'út' },
+      { id: 'kss7', tegund: 'tölvupóstur', titill: 'Afsökunarbréf og uppfærsla', lysing: 'Sent formlegt afsökunarbréf á Kristínu með tímalínu og tilboði um afslátt.', dagsetning: '2026-01-30T14:00:00', notandi: 'Sigurður', stefna: 'út' },
+      { id: 'kss8', tegund: 'símtal', titill: 'Bíll tilbúinn', lysing: 'Hringt í Kristínu – bíll tilbúinn til afhendingar. Þakkaði fyrir þolinmæðina.', dagsetning: '2026-02-02T16:00:00', notandi: 'Helgi', stefna: 'út' },
+      { id: 'kss9', tegund: 'símtal', titill: 'Eftirfylgni og ánægjumat', lysing: 'Hringt í Kristínu viku eftir. Ánægð með afgreiðslu og afsláttinn.', dagsetning: '2026-02-05T10:30:00', notandi: 'Sigurður', stefna: 'út' },
+    ],
+    baetur: [
+      { id: 'kb1', tegund: 'afsláttur', lysing: '10% afsláttur af febrúarmánaðar leigu (Kia Picanto KP-101)', verdmaeti: 7690, samthykkt: true, dagsetning: '2026-02-03' },
+    ],
+    greining: {
+      flokkur: 'afhending',
+      orsok: 'Dekkjaskortur hjá birgi vegna óvæntrar eftirspurnar í janúar.',
+      alvarleiki: 'miðlungs',
+      ahrif: 'Viðskiptavinur beið 5 daga umfram áætlun. Óþægindi en ekki alvarlegt.',
+      forvarnaradgerdir: 'Panta dekkjabirgðir fyrr á tímabilinu. Tryggja varadekk á lager.',
+    },
+    anaegjumat: {
+      einkunn: 4,
+      athugasemd: 'Ánægð með hvernig var brugðist við. Afslátturinn var góð sáttabót.',
+      dagsetning: '2026-02-05',
+    },
+  },
+];
+
+export function getKvortunFerill(malId: string): KvortunFerill | undefined {
+  return kvortunFerillar.find(k => k.malId === malId);
+}
+
 // ============ SNJÖLL TÆKIFÆRAGREINING ============
 
 export type TaekifaeriFlokkur =

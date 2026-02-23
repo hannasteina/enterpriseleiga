@@ -86,7 +86,11 @@ export default function BilarPage() {
     const iLeigu = bilarList.filter(b => b.status === 'í leigu').length;
     const lausir = bilarList.filter(b => b.status === 'laus').length;
     const iThjonustu = bilarList.filter(b => b.status === 'í þjónustu').length;
-    return { total, iLeigu, lausir, iThjonustu };
+    const skilVaentanleg = bilarList.filter(b => {
+      const d = getDaysUntilExpiry(b.samningurId);
+      return d !== null && d > 0 && d <= 30;
+    }).length;
+    return { total, iLeigu, lausir, iThjonustu, skilVaentanleg };
   }, [bilarList]);
 
   function handleAddCar(newBill: Bill) {
@@ -126,44 +130,107 @@ export default function BilarPage() {
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link href="/samningar" className="group bg-[#161822] rounded-xl border border-white/5 p-5 hover:bg-white/5 transition-colors block">
-          <div className="text-xs font-medium text-white/40 mb-2">Heildarfjöldi bíla</div>
+        <button
+          onClick={() => setStatusFilter('allir')}
+          className={`group text-left rounded-xl border p-5 transition-all ${
+            statusFilter === 'allir'
+              ? 'bg-white/[0.06] border-white/15 ring-1 ring-white/10'
+              : 'bg-[#161822] border-white/5 hover:bg-white/5'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-medium text-white/40">Heildarfjöldi bíla</div>
+            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+              <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+              </svg>
+            </div>
+          </div>
           <div className="text-2xl font-bold text-white">{stats.total}</div>
           <div className="flex items-center gap-1 mt-3 text-[10px] font-medium text-white/30 group-hover:text-white/60 transition-colors">
-            <span>Samningar</span>
+            <span>Sýna alla bíla</span>
             <svg className="w-3 h-3 transform group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
           </div>
-        </Link>
-        <Link href="/vidskiptavinir" className="group bg-[#161822] rounded-xl border border-white/5 p-5 hover:bg-white/5 transition-colors block">
-          <div className="text-xs font-medium text-white/40 mb-2">Í útleigu</div>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('í leigu')}
+          className={`group text-left rounded-xl border p-5 transition-all ${
+            statusFilter === 'í leigu'
+              ? 'bg-blue-500/10 border-blue-500/30 ring-1 ring-blue-500/20'
+              : 'bg-[#161822] border-white/5 hover:bg-white/5'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-medium text-white/40">Í útleigu</div>
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+              </svg>
+            </div>
+          </div>
           <div className="text-2xl font-bold" style={{ color: '#3b82f6' }}>
             {stats.iLeigu}
           </div>
-          <div className="flex items-center gap-1 mt-3 text-[10px] font-medium text-white/30 group-hover:text-white/60 transition-colors">
-            <span>Viðskiptavinir</span>
+          <div className="flex items-center gap-1 mt-3 text-[10px] font-medium text-white/30 group-hover:text-blue-400/60 transition-colors">
+            {stats.skilVaentanleg > 0 ? (
+              <span className="text-amber-400/70">{stats.skilVaentanleg} skil næstu 30 daga</span>
+            ) : (
+              <span>Sía eftir útleigu</span>
+            )}
             <svg className="w-3 h-3 transform group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
           </div>
-        </Link>
-        <Link href="/thjonusta" className="group bg-[#161822] rounded-xl border border-white/5 p-5 hover:bg-white/5 transition-colors block">
-          <div className="text-xs font-medium text-white/40 mb-2">Lausir</div>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('laus')}
+          className={`group text-left rounded-xl border p-5 transition-all ${
+            statusFilter === 'laus'
+              ? 'bg-green-500/10 border-green-500/30 ring-1 ring-green-500/20'
+              : 'bg-[#161822] border-white/5 hover:bg-white/5'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-medium text-white/40">Lausir</div>
+            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+              <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
           <div className="text-2xl font-bold" style={{ color: '#22c55e' }}>
             {stats.lausir}
           </div>
-          <div className="flex items-center gap-1 mt-3 text-[10px] font-medium text-white/30 group-hover:text-white/60 transition-colors">
-            <span>Áminningar</span>
+          <div className="flex items-center gap-1 mt-3 text-[10px] font-medium text-white/30 group-hover:text-green-400/60 transition-colors">
+            <span>Tilbúnir til útleigu</span>
             <svg className="w-3 h-3 transform group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
           </div>
-        </Link>
-        <Link href="/ferlar" className="group bg-[#161822] rounded-xl border border-white/5 p-5 hover:bg-white/5 transition-colors block">
-          <div className="text-xs font-medium text-white/40 mb-2">Í þjónustu</div>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('í þjónustu')}
+          className={`group text-left rounded-xl border p-5 transition-all ${
+            statusFilter === 'í þjónustu'
+              ? 'bg-amber-500/10 border-amber-500/30 ring-1 ring-amber-500/20'
+              : 'bg-[#161822] border-white/5 hover:bg-white/5'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-medium text-white/40">Í þjónustu</div>
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+              <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17l-5.384 3.183A1.25 1.25 0 014.5 17.18V6.82a1.25 1.25 0 011.536-1.173l5.384 3.183m0 0a1.125 1.125 0 010 2.346m0-2.346a1.125 1.125 0 000 2.346m5.06-9.283A9.75 9.75 0 0121.75 12c0 1.875-.527 3.627-1.44 5.117" />
+              </svg>
+            </div>
+          </div>
           <div className="text-2xl font-bold" style={{ color: '#f59e0b' }}>
             {stats.iThjonustu}
           </div>
-          <div className="flex items-center gap-1 mt-3 text-[10px] font-medium text-white/30 group-hover:text-white/60 transition-colors">
-            <span>Ferlar</span>
+          <div className="flex items-center gap-1 mt-3 text-[10px] font-medium text-white/30 group-hover:text-amber-400/60 transition-colors">
+            <span>Skoða viðhaldsstöðu</span>
             <svg className="w-3 h-3 transform group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
           </div>
-        </Link>
+        </button>
       </div>
 
       {/* Filters and Search */}
